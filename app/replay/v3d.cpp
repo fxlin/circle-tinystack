@@ -6,6 +6,7 @@
 #include <circle/bcm2711.h>
 #include <circle/memio.h>
 #include <circle/bcmpropertytags.h>
+#include <linux/printk.h>
 
 #include "v3d.h"
 #include "v3d_regs.h"
@@ -149,31 +150,31 @@ void CV3D::power_on(void)
 	asb_power_on();
 }
 
+void CV3D::dump_v3d_regs(void)
+{
+	printk("V3D_HUB_IDENT0: %08x", V3D_READ(V3D_HUB_IDENT0));
+	printk("V3D_HUB_IDENT1: %08x", V3D_READ(V3D_HUB_IDENT1));
+	printk("V3D_HUB_IDENT2: %08x", V3D_READ(V3D_HUB_IDENT2));
+	printk("V3D_HUB_IDENT3: %08x", V3D_READ(V3D_HUB_IDENT3));
+	printk("V3D_MMU_DEBUG_INFO: %08x", V3D_READ(V3D_MMU_DEBUG_INFO));
+}
+
+void CV3D::dump_asb_regs(void)
+{
+	printk("ASB_BRDG_VERSION: %08x (should be: 0)", ASB_READ(ASB_BRDG_VERSION));
+	/* 0x62726467, "BRDG". cf bcm2835-power.c */
+	printk("ASB_AXI_BRDG_ID: %08x (should be: 0x62726467)", ASB_READ(ASB_AXI_BRDG_ID));
+}
+
 boolean CV3D::Init(void)
 {
-	u32 val = 0;
 
-	val = V3D_READ(V3D_HUB_IDENT0);
-	CLogger::Get()->Write (FromKernel, LogNotice, "V3D_HUB_IDENT0: %08x", val);
-
-	val = V3D_READ(V3D_HUB_IDENT1);
-	CLogger::Get()->Write (FromKernel, LogNotice, "V3D_HUB_IDENT1: %08x", val);
-
-	val = V3D_READ(V3D_HUB_IDENT2);
-	CLogger::Get()->Write (FromKernel, LogNotice, "V3D_HUB_IDENT2: %08x", val);
-
-	val = V3D_READ(V3D_HUB_IDENT3);
-	CLogger::Get()->Write (FromKernel, LogNotice, "V3D_HUB_IDENT3: %08x", val);
-
-	val = V3D_READ(V3D_MMU_DEBUG_INFO);
-	CLogger::Get()->Write (FromKernel, LogNotice, "V3D_MMU_DEBUG_INFO: %08x", val);
-
-	val = read32(ARM_LOCAL_PRESCALER);
-	CLogger::Get()->Write (FromKernel, LogNotice, "another read: %08x", val);
-
+	/* tess random num gen. to show reg read works */
+#if 0
 	CLogger::Get()->Write (FromKernel, LogNotice, "random: %08x", read32(ARM_HW_RNG200_BASE + 0x20));
 	CLogger::Get()->Write (FromKernel, LogNotice, "random: %08x", read32(ARM_HW_RNG200_BASE + 0x20));
 	CLogger::Get()->Write (FromKernel, LogNotice, "random: %08x", read32(ARM_HW_RNG200_BASE + 0x20));
+#endif
 
 	// check property
 	{
@@ -313,7 +314,6 @@ boolean CV3D::Init(void)
 //			}
 //		}
 
-		{
 			// xzl cf bcm2835.h
 //			for (u32 x = 0; x < 0x400; x+=4) {
 //				CLogger::Get()->Write (FromKernel, LogNotice, "%08x: %08x",
@@ -325,27 +325,13 @@ boolean CV3D::Init(void)
 //					x, read32(x));
 
 		// and read regs...
-		val = V3D_READ(V3D_HUB_IDENT0);
-			CLogger::Get()->Write (FromKernel, LogNotice, "V3D_HUB_IDENT0: %08x", val);
-			CLogger::Get()->Write (FromKernel, LogNotice, "V3D_CTL_IDENT0: %08x",
-					V3D_CORE_READ(core, V3D_CTL_IDENT0));
-
-			CLogger::Get()->Write (FromKernel, LogNotice, "asb bridge version %08x",
-//											read32(0xFE000000 + 0xa000 + 0x00));
-							ASB_READ(ASB_BRDG_VERSION));
-
-			/* 0x62726467, "BRDG". cf bcm2835-power.c */
-			CLogger::Get()->Write (FromKernel, LogNotice, "asb bridge id %08x",
-//								read32(0xFE000000 + 0xa000 + 0x20));
-						ASB_READ(ASB_AXI_BRDG_ID));
-		}
+		dump_v3d_regs();
+		dump_asb_regs();
 
 		power_on();
 
 		// read reg again
-		CLogger::Get()->Write (FromKernel, LogNotice, "V3D_HUB_IDENT0: %08x",
-				V3D_READ(V3D_HUB_IDENT0));
-
+		dump_v3d_regs();
 	}
 
 	return true;

@@ -26,6 +26,8 @@ private:
 	void asb_power_on(void);
 	void asb_power_off(void);
 	void set_clock(bool enable);
+	void dump_v3d_regs(void);
+	void dump_asb_regs(void);
 //	CLogger			m_Logger;
 };
 

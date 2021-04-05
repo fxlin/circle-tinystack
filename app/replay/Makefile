@@ -10,6 +10,7 @@ OBJS	= main.o kernel.o v3d.o
 	  $(CIRCLEHOME)/lib/libcircle.a
 
 LIBS	= $(CIRCLEHOME)/lib/libcircle.a
+LIBS	+= $(CIRCLEHOME)/addon/linux/liblinuxemu.a  # for printk
 	  
 include ../Rules.mk
 

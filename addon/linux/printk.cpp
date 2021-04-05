@@ -28,12 +28,14 @@ int printk (const char *fmt, ...)
 	{
 		*pLineEnd = '\0';
 
-		CLogger::Get ()->Write (From, LogDebug, "%s", pLine);
+//		CLogger::Get ()->Write (From, LogDebug, "%s", pLine);
+		CLogger::Get ()->Write (From, LogNotice, "%s", pLine); // xzl
 	}
 
 	if (*pLine != '\0')
 	{
-		CLogger::Get ()->Write (From, LogDebug, "%s", pLine);
+//		CLogger::Get ()->Write (From, LogDebug, "%s", pLine);
+		CLogger::Get ()->Write (From, LogNotice, "%s", pLine);		// xzl
 	}
 
 	return Msg.GetLength ();
