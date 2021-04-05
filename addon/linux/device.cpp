@@ -1,6 +1,8 @@
 #include <linux/device.h>
 #include <circle/logger.h>
 
+// xzl: wrap around clogger
+
 static const char FromDevice[] = "device";
 
 void __iomem *devm_ioremap_resource (struct device *dev, struct resource *res)

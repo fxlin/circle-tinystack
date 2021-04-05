@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
+// xzl: does this create mapping?
 #include <circle/translationtable64.h>
 #include <circle/synchronize.h>
 #include <circle/sysconfig.h>

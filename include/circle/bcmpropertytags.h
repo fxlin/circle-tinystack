@@ -35,7 +35,15 @@
 #define PROPTAG_GET_BOARD_SERIAL	0x00010004
 #define PROPTAG_GET_ARM_MEMORY		0x00010005
 #define PROPTAG_GET_VC_MEMORY		0x00010006
+
 #define PROPTAG_SET_POWER_STATE		0x00028001
+#define PROPTAG_GET_DOMAIN_STATE 	0x00030030	// xzl
+#define PROPTAG_SET_DOMAIN_STATE		0x00038030 // xzl
+#define PROPTAG_GET_POWER_STATE		0x00020001	// xzl
+
+#define PROPTAG_GET_CLOCK_STATE		0x00030001	// xzl
+#define PROPTAG_SET_CLOCK_STATE		0x00038001	// xzl
+
 #define PROPTAG_GET_CLOCK_RATE		0x00030002
 #define PROPTAG_GET_MAX_CLOCK_RATE	0x00030004
 #define PROPTAG_GET_TEMPERATURE		0x00030006
@@ -145,12 +153,16 @@ struct TPropertyTagMemory
 }
 PACKED;
 
+// xzl: used for powerstate and also domain state
 struct TPropertyTagPowerState
 {
 	TPropertyTag	Tag;
 	u32		nDeviceId;
 	#define DEVICE_ID_SD_CARD	0
 	#define DEVICE_ID_USB_HCD	3
+	#define RPI_POWER_DOMAIN_HDMI	5 // from raspberrypi-power.h
+	#define RPI_POWER_DOMAIN_ARM	22 // from raspberrypi-power.h
+	#define RPI_POWER_DOMAIN_V3D	10 // from raspberrypi-power.h
 	u32		nState;
 	#define POWER_STATE_OFF		(0 << 0)
 	#define POWER_STATE_ON		(1 << 0)
@@ -167,8 +179,18 @@ struct TPropertyTagClockRate
 	#define CLOCK_ID_UART		2
 	#define CLOCK_ID_ARM		3
 	#define CLOCK_ID_CORE		4
+	#define CLOCK_ID_V3D		5 // xzl
 	#define CLOCK_ID_EMMC2		12
 	u32		nRate;			// Hz
+}
+PACKED;
+
+// xzl
+struct TPropertyTagClockState
+{
+	TPropertyTag	Tag;
+	u32		nClockId;
+	u32		nState;			// 0/1
 }
 PACKED;
 

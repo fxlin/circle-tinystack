@@ -19,6 +19,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
+// xzl: phys mem layout?
+
 #ifndef _circle_memorymap_h
 #define _circle_memorymap_h
 

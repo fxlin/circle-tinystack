@@ -93,3 +93,9 @@ tmp/
 # Other
 # ----------------------------------------------
 /circle.geany
+
+# xzl
+.cproject
+.project
+.settings/
+

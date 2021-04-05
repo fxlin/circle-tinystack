@@ -29,8 +29,8 @@ firmware: clean
 	wget -q -O bcm2711-rpi-4-b.dtb $(BASEURL)/bcm2711-rpi-4-b.dtb?raw=true
 	wget -q -O bcm2711-rpi-cm4.dtb $(BASEURL)/bcm2711-rpi-cm4.dtb?raw=true
 
-all: firmware bootloader
-
+#all: firmware bootloader
+all: firmware bootloader bootloader64  #xzl
 bootloader:
 	make -C "../tools/bootloader"
 	cp ../tools/bootloader/kernel.img .

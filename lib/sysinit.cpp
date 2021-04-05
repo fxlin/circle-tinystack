@@ -207,7 +207,7 @@ void sysinit (void)
 
 	CMachineInfo MachineInfo;
 
-	CMemorySystem Memory;
+	CMemorySystem Memory;  // xzl: MMU on
 
 #if RASPPI >= 4
 	MachineInfo.FetchDTB ();

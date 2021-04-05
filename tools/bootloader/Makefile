@@ -2,7 +2,9 @@
 -include ../../Config2.mk
 
 PREFIX ?= arm-none-eabi-
-PREFIX64 ?= aarch64-none-elf-
+#PREFIX64 ?= aarch64-none-elf-
+# xzl
+PREFIX64 ?= aarch64-linux-gnu-
 FLASHBAUD ?= 115200
 
 ARMGNU ?= $(PREFIX)

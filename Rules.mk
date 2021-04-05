@@ -23,10 +23,11 @@ CIRCLEHOME ?= ..
 -include $(CIRCLEHOME)/Config.mk
 -include $(CIRCLEHOME)/Config2.mk	# is not overwritten by "configure"
 
-AARCH	 ?= 32
-RASPPI	 ?= 1
+AARCH	 ?= 64
+RASPPI	 ?= 4
 PREFIX	 ?= arm-none-eabi-
-PREFIX64 ?= aarch64-none-elf-
+#PREFIX64 ?= aarch64-none-elf-
+PREFIX64 ?= aarch64-linux-gnu-
 
 # see: doc/stdlib-support.txt
 STDLIB_SUPPORT ?= 1
@@ -180,7 +181,7 @@ endif
 #
 # Eclipse support
 #
-
+# xzl: can't set it here. should set in Config.mk to be compiled into bootloader
 SERIALPORT  ?= /dev/ttyUSB0
 USERBAUD ?= 115200
 FLASHBAUD ?= 115200

@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // 
+// xzl: parse kernel cmdline from CBcmPropertyTags?
 #ifndef _circle_koptions_h
 #define _circle_koptions_h
 
@@ -63,7 +64,7 @@ private:
 	unsigned m_nWidth;
 	unsigned m_nHeight;
 
-	char m_LogDevice[20];
+	char m_LogDevice[20];  // xzl: set in ctor?
 	unsigned m_nLogLevel;
 
 	char m_KeyMap[3];

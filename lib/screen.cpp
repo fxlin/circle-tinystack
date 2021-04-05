@@ -24,6 +24,8 @@
 
 #define ROTORS		4
 
+// xzl: !SCREEN_HEADLESS then register as tty1
+
 #ifndef SCREEN_HEADLESS
 
 enum TScreenState

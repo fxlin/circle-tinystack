@@ -236,6 +236,63 @@
 #define ARM_PADS_HYST		(0x01 << 3)
 #define ARM_PADS_DRIVE(val)	((val) & 0x3)
 
+// xzl: extra def from bcm2835-power.c
+#define PM_PASSWORD			0x5a000000
+
+#define PM_IMAGE			0x108
+#define PM_GRAFX			0x10c
+#define PM_PROC				0x110
+#define PM_ENAB				BIT(12)
+#define PM_ISPRSTN			BIT(8)
+#define PM_H264RSTN			BIT(7)
+#define PM_PERIRSTN			BIT(6)
+#define PM_V3DRSTN			BIT(6)
+#define PM_ISFUNC			BIT(5)
+#define PM_MRDONE			BIT(4)
+#define PM_MEMREP			BIT(3)
+#define PM_ISPOW			BIT(2)
+#define PM_POWOK			BIT(1)
+#define PM_POWUP			BIT(0)
+#define PM_INRUSH_SHIFT			13
+#define PM_INRUSH_3_5_MA		0
+#define PM_INRUSH_5_MA			1
+#define PM_INRUSH_10_MA			2
+#define PM_INRUSH_20_MA			3
+#define PM_INRUSH_MASK			(3 << PM_INRUSH_SHIFT)
+
+// xzl: asb bridge. from bcm2835-power.c
+
+//#define ARM_ASB_BASE		(ARM_IO_BASE + 0xa000) // xzl
+#define ARM_ASB_BASE		(ARM_IO_BASE + 0x00c11000) // xzl
+
+
+#define ASB_BRDG_VERSION                0x00
+#define ASB_CPR_CTRL                    0x04
+
+#define ASB_V3D_S_CTRL			0x08
+#define ASB_V3D_M_CTRL			0x0c
+#define ASB_ISP_S_CTRL			0x10
+#define ASB_ISP_M_CTRL			0x14
+#define ASB_H264_S_CTRL			0x18
+#define ASB_H264_M_CTRL			0x1c
+
+#define ASB_REQ_STOP                    BIT(0)
+#define ASB_ACK                         BIT(1)
+#define ASB_EMPTY                       BIT(2)
+#define ASB_FULL                        BIT(3)
+
+#define ASB_AXI_BRDG_ID			0x20
+
+// xzl
+#define PM_READ(reg) read32(ARM_PM_BASE + (reg))
+#define PM_WRITE(reg, val) \
+	write32(ARM_PM_BASE + reg, PM_PASSWORD | (val))
+
+#define ASB_READ(reg) read32(ARM_ASB_BASE + (reg))
+#define ASB_WRITE(reg, val) \
+	write32(ARM_ASB_BASE + reg, PM_PASSWORD | (val))
+
+
 //
 // BSC Master
 //

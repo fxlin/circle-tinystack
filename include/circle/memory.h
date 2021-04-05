@@ -34,7 +34,7 @@
 class CMemorySystem
 {
 public:
-	CMemorySystem (boolean bEnableMMU = TRUE);
+	CMemorySystem (boolean bEnableMMU = TRUE); // xzl: by default MMU on .. what mapping?
 	~CMemorySystem (void);
 
 	void Destructor (void);		// explicit callable
