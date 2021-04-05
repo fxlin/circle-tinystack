@@ -1,3 +1,31 @@
+xzl:  workflow
+
+load bootloader64 to uSD of rpi4
+
+on dev machine, change code -> make -> sudo make flash
+
+developing w/ eclipse seems for Linux only (windows is more difficult)
+
+flash over serial seems enough
+
+add Config.mk; high baudrate is fine. 
+
+go to boot/, 
+make firmware bootloader64
+
+this will build bootloader in tools/bootloader. 
+
+copy all to uSD. NB: the bootloader for rpi4 should be kernel8-rpi4.img
+
+to see debug msg, make sure change cmdline.txt
+logdev=tty1 loglevel=4
+
+these will be loaded as kernel options
+
+USB storage problem? make sure all firmware up to date
+
+The original README below: 
+
 Circle
 ======
 
