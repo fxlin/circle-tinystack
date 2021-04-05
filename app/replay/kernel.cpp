@@ -81,5 +81,10 @@ TShutdownMode CKernel::Run (void)
 
 	m_v3d.Init();
 
+//	int *p = new int(20);
+//	delete p;
+
+	return ShutdownReboot;
+
 	return ShutdownHalt;
 }

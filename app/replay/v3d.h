@@ -28,6 +28,9 @@ private:
 	void set_clock(bool enable);
 	void dump_v3d_regs(void);
 	void dump_asb_regs(void);
+	void dump_clk_states(void);
+	void set_pd_states(void);
+	void dump_pd_states(void);
 //	CLogger			m_Logger;
 };
 
