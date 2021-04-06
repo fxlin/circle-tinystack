@@ -4,6 +4,7 @@
 #include <circle/bcm2835.h>
 #include <circle/bcm2711.h>
 #include <circle/memio.h>
+#include <linux/printk.h>
 
 #include "kernel.h"
 
@@ -71,20 +72,18 @@ TShutdownMode CKernel::Run (void)
 	m_Logger.Write (FromKernel, LogNotice, "hello world -- and bye! %08x", m_random.GetNumber());
 	m_Logger.Write (FromKernel, LogNotice, "hello world -- and bye! %08x", m_random.GetNumber());
 
-//	PeripheralEntry ();
-//	m_Logger.Write (FromKernel, LogNotice, "hello world -- and bye! %08x", read32(ARM_HW_RNG200_BASE + 0x20));
-//	PeripheralExit ();
-
-//	m_v3d.Init();
-
-	m_Timer.MsDelay(1000);
+//	m_Timer.MsDelay(1000);
 
 	m_v3d.Init();
 
 //	int *p = new int(20);
 //	delete p;
 
-	return ShutdownReboot;
+	int secs = 10;
+	printk("to reboot in %d secs...", secs);
+	m_Timer.MsDelay(secs * 1000);
+
+	return ShutdownReboot;	// will cause reboot
 
 	return ShutdownHalt;
 }

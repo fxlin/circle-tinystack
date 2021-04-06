@@ -15,16 +15,8 @@
 
 static const char * FromKernel = "v3d";
 
-CV3D::CV3D (void)
-{
-}
-
-CV3D::~CV3D (void)
-{
-}
-
 // cf: bcm2835_asb_enable
-int CV3D::asb_enable(u32 reg)
+int asb_enable(u32 reg)
 {
 	if (!reg)
 		return 0;
@@ -38,7 +30,7 @@ int CV3D::asb_enable(u32 reg)
 		return 0;
 }
 
-int CV3D::asb_disable(u32 reg)
+int asb_disable(u32 reg)
 {
 	if (!reg)
 		return 0;
@@ -52,107 +44,9 @@ int CV3D::asb_disable(u32 reg)
 		return 0;
 }
 
-void CV3D::set_clock(bool enable)
-{
-		CBcmPropertyTags Tags;
-		TPropertyTagClockState st;
-
-		st.nClockId = CLOCK_ID_V3D;
-		st.nState = enable ? 1 : 0;
-
-		if (!Tags.GetTag (PROPTAG_SET_CLOCK_STATE, &st, sizeof st))
-			CLogger::Get()->Write (FromKernel, LogNotice, "set tag failed");
-		else
-			CLogger::Get()->Write (FromKernel, LogNotice, "set clock state %u", st.nState);
-}
-
-// cf: bcm2835_asb_power_on
-void CV3D::asb_power_on(void)
-{
-	u32 pm_reg = PM_GRAFX;
-	u32 asb_m_reg = ASB_V3D_M_CTRL;
-	u32 asb_s_reg = ASB_V3D_S_CTRL;
-	u32 reset_flags = PM_V3DRSTN;
-
-	// can succeed...
-//	u32 pm_reg = PM_IMAGE;
-//	u32 asb_m_reg = ASB_ISP_S_CTRL;
-//	u32 asb_s_reg = ASB_ISP_M_CTRL;
-//	u32 reset_flags = PM_ISPRSTN;
-
-	// also can succeed
-//		asb_m_reg = ASB_H264_S_CTRL;
-//		asb_s_reg = ASB_H264_M_CTRL;
-
-#if 1
-
-	set_clock(true);
-	CTimer::Get()->usDelay(100);
-	set_clock(false);
-
-	/* Deassert the resets. */
-	PM_WRITE(pm_reg, PM_READ(pm_reg) & ~reset_flags);
-
-	CLogger::Get()->Write (FromKernel, LogNotice, "before reset %08x. ARM_PM_BASE %08x",
-			PM_READ(pm_reg), ARM_PM_BASE);
-
-	PM_WRITE(pm_reg, PM_READ(pm_reg) | reset_flags);
-
-	CLogger::Get()->Write (FromKernel, LogNotice, "after reset %08x",
-				PM_READ(pm_reg)); // no change? still 0000_1000
-
-	set_clock(true);
-#endif
-
-	CTimer::Get()->usDelay(100);
-
-	// master
-	int ret = asb_enable(asb_m_reg);
-	if (!ret)
-		CLogger::Get()->Write (FromKernel, LogNotice, "enable master ok");
-	else
-		CLogger::Get()->Write (FromKernel, LogNotice, "enable master failed. ret %d", ret);
-
-	// slave
-	ret = asb_enable(asb_s_reg);
-	if (!ret)
-		CLogger::Get()->Write (FromKernel, LogNotice, "enable slave ok");
-	else
-		CLogger::Get()->Write (FromKernel, LogNotice, "enable slave failed. ret %d", ret);
-
-	CTimer::Get()->usDelay(100);
-}
-
-void CV3D::asb_power_off(void)
-{
-	u32 pm_reg = PM_GRAFX;
-	u32 asb_m_reg = ASB_V3D_M_CTRL;
-	u32 asb_s_reg = ASB_V3D_S_CTRL;
-	u32 reset_flags = PM_V3DRSTN;
-
-	int ret = asb_disable(asb_m_reg);
-	if (!ret)
-		CLogger::Get()->Write (FromKernel, LogNotice, "disable master ok");
-	else
-		CLogger::Get()->Write (FromKernel, LogNotice, "disable master failed. ret %d", ret);
-
-	// slave
-	ret = asb_disable(asb_s_reg);
-	if (!ret)
-		CLogger::Get()->Write (FromKernel, LogNotice, "disable slave ok");
-	else
-		CLogger::Get()->Write (FromKernel, LogNotice, "disable slave failed. ret %d", ret);
-
-	PM_WRITE(pm_reg, PM_READ(pm_reg) & ~reset_flags);
-}
 
 
-void CV3D::power_on(void)
-{
-	asb_power_on();
-}
-
-void CV3D::dump_v3d_regs(void)
+void dump_v3d_regs(void)
 {
 	printk("V3D_HUB_IDENT0: %08x", V3D_READ(V3D_HUB_IDENT0));
 	printk("V3D_HUB_IDENT1: %08x", V3D_READ(V3D_HUB_IDENT1));
@@ -161,7 +55,7 @@ void CV3D::dump_v3d_regs(void)
 	printk("V3D_MMU_DEBUG_INFO: %08x", V3D_READ(V3D_MMU_DEBUG_INFO));
 }
 
-void CV3D::dump_asb_regs(void)
+void dump_asb_regs(void)
 {
 	printk("ASB_BRDG_VERSION: %08x (should be: 0)", ASB_READ(ASB_BRDG_VERSION));
 	/* 0x62726467, "BRDG". cf bcm2835-power.c */
@@ -187,7 +81,7 @@ enum rpi_firmware_clk_id {
 	RPI_FIRMWARE_NUM_CLK_ID,
 };
 
-void CV3D::dump_clk_states(void)
+void dump_clk_states(void)
 {
 	CBcmPropertyTags Tags;
 	TPropertyTagClockState st;
@@ -211,9 +105,22 @@ void CV3D::dump_clk_states(void)
 
 	printk("%s\n", p);
 	delete p;
-//	free(buf);
 }
 
+// set all clks on
+void set_clk_states(void)
+{
+	// set all clock states
+	CBcmPropertyTags Tags;
+	TPropertyTagClockState st;
+	st.nState = 1;
+
+	for (int i = 1; i < RPI_FIRMWARE_NUM_CLK_ID; i++) {
+		st.nClockId = i;
+		if (!Tags.GetTag (PROPTAG_SET_CLOCK_STATE, &st, sizeof st))
+			CLogger::Get()->Write (FromKernel, LogNotice, "set tag failed");
+	}
+}
 
 
 /* These power domain indices are the firmware interface's indices
@@ -246,8 +153,7 @@ void CV3D::dump_clk_states(void)
 
 #define RPI_POWER_DOMAIN_COUNT		23
 
-
-void CV3D::dump_pd_states(void)
+void dump_pd_states(void)
 {
 		CBcmPropertyTags Tags;
 		TPropertyTagPowerState r;
@@ -270,7 +176,7 @@ void CV3D::dump_pd_states(void)
 }
 
 // turn all power domains on.
-void CV3D::set_pd_states(void)
+void set_pd_states(void)
 {
 	CBcmPropertyTags Tags;
 	TPropertyTagPowerState r;
@@ -281,10 +187,37 @@ void CV3D::set_pd_states(void)
 
 		if (!Tags.GetTag (PROPTAG_SET_DOMAIN_STATE, &r, sizeof r))
 			CLogger::Get()->Write (FromKernel, LogNotice, "get tag failed");
-//		else
-//			CLogger::Get()->Write (FromKernel, LogNotice, "set domain %d: %u", i, r.nState);
 	}
 }
+
+
+// --------------------- cv3d ------------------------ //
+
+CV3D::CV3D (void)
+{
+}
+
+CV3D::~CV3D (void)
+{
+
+}
+
+
+
+void CV3D::clock_on(bool enable)
+{
+		CBcmPropertyTags Tags;
+		TPropertyTagClockState st;
+
+		st.nClockId = CLOCK_ID_V3D;
+		st.nState = enable ? 1 : 0;
+
+		if (!Tags.GetTag (PROPTAG_SET_CLOCK_STATE, &st, sizeof st))
+			CLogger::Get()->Write (FromKernel, LogNotice, "set tag failed");
+		else
+			CLogger::Get()->Write (FromKernel, LogNotice, "set clock state %u", st.nState);
+}
+
 
 boolean CV3D::Init(void)
 {
@@ -295,18 +228,6 @@ boolean CV3D::Init(void)
 	CLogger::Get()->Write (FromKernel, LogNotice, "random: %08x", read32(ARM_HW_RNG200_BASE + 0x20));
 	CLogger::Get()->Write (FromKernel, LogNotice, "random: %08x", read32(ARM_HW_RNG200_BASE + 0x20));
 #endif
-
-	// check v3d clock state
-	{
-		CBcmPropertyTags Tags;
-		TPropertyTagClockState st;
-		st.nClockId = CLOCK_ID_V3D;
-
-		if (!Tags.GetTag (PROPTAG_GET_CLOCK_STATE, &st, sizeof st))
-			CLogger::Get()->Write (FromKernel, LogNotice, "get tag failed");
-		else
-			CLogger::Get()->Write (FromKernel, LogNotice, "v3d clock state %u", st.nState);
-	}
 
 	// check v3d clock rate
 	{
@@ -320,89 +241,107 @@ boolean CV3D::Init(void)
 			printk("v3d clock rate %u", r.nRate);
 	}
 
-//	asb_power_off();
-//	CLogger::Get()->Write (FromKernel, LogNotice, "reset status PM_GRAFX %08x",
-//			PM_READ(PM_GRAFX) & PM_V3DRSTN);
-//	power_on();
-//	CLogger::Get()->Write (FromKernel, LogNotice, "reset status PM_GRAFX %08x",
-//				PM_READ(PM_GRAFX) & PM_V3DRSTN);
-
-
-
-	// enable all power domain states
-//	{
-
-//	}
-
-	// set all clock states
-	{
-			CBcmPropertyTags Tags;
-			TPropertyTagClockState st;
-			st.nState = 1;
-
-			for (int i = 1; i <14; i++) {
-				st.nClockId = i;
-				if (!Tags.GetTag (PROPTAG_SET_CLOCK_STATE, &st, sizeof st))
-					CLogger::Get()->Write (FromKernel, LogNotice, "set tag failed");
-				else
-					CLogger::Get()->Write (FromKernel, LogNotice, "clock %d state %u", i, st.nState);
-			}
-	}
-
+	set_clk_states();
 	dump_clk_states();
+
+	// turn all power domains on via firmware. this seems not enough
 	dump_pd_states();
 	set_pd_states();
 	dump_pd_states();
 
-	{
-		CBcmPropertyTags Tags;
-		TPropertyTagPowerState r;
-//		r.nDeviceId = RPI_POWER_DOMAIN_V3D;
 
-//		if (!Tags.GetTag (PROPTAG_GET_DOMAIN_STATE, &r, sizeof r))
-//			CLogger::Get()->Write (FromKernel, LogNotice, "get tag failed");
-//		else
-//			CLogger::Get()->Write (FromKernel, LogNotice, "get domain is %u", r.nState);
-//
-//		// set power domain
-//		CLogger::Get()->Write (FromKernel, LogNotice, "set all power domain states...");
-//		r.nState = 1 | POWER_STATE_WAIT;
-//		if (!Tags.GetTag (PROPTAG_SET_DOMAIN_STATE, &r, sizeof r))
-//			CLogger::Get()->Write (FromKernel, LogNotice, "set tag failed");
+	dump_v3d_regs();
 
-//		// get again..
-//		//r.nDeviceId = RPI_POWER_DOMAIN_HDMI;
-//		r.nDeviceId = RPI_POWER_DOMAIN_V3D;
-//		if (!Tags.GetTag (PROPTAG_GET_DOMAIN_STATE, &r, sizeof r))
-//					CLogger::Get()->Write (FromKernel, LogNotice, "get tag failed");
-//		else
-//			CLogger::Get()->Write (FromKernel, LogNotice, "get domain v3d tag is %u", r.nState);
-//
+	// will have to turn v3d on via asb, as did in linux
+	dump_asb_regs();
+	power_on();
 
-		// get all power domain states
-//		{
-//			CBcmPropertyTags Tags;
-//			TPropertyTagPowerState r;
-//
-//			for (int i =0; i < 23; i++) {
-//				r.nDeviceId = i;
-//				if (!Tags.GetTag (PROPTAG_GET_DOMAIN_STATE, &r, sizeof r))
-//					CLogger::Get()->Write (FromKernel, LogNotice, "get tag failed");
-//				else
-//					CLogger::Get()->Write (FromKernel, LogNotice, "domain %d: %u", i, r.nState);
-//			}
-//		}
-
-		// and read regs...
-		dump_v3d_regs();
-		dump_asb_regs();
-
-		power_on();
-
-		// read reg again
-		dump_v3d_regs();
-	}
+	// read reg again
+	dump_v3d_regs();
 
 	return true;
 }
-// ...
+
+/*
+ cf: bcm2835_asb_power_on
+*/
+void CV3D::asb_power_on(void)
+{
+	u32 pm_reg = PM_GRAFX;
+	u32 asb_m_reg = ASB_V3D_M_CTRL;
+	u32 asb_s_reg = ASB_V3D_S_CTRL;
+	u32 reset_flags = PM_V3DRSTN;
+
+	// other modules
+//	u32 pm_reg = PM_IMAGE;
+//	u32 asb_m_reg = ASB_ISP_S_CTRL;
+//	u32 asb_s_reg = ASB_ISP_M_CTRL;
+//	u32 reset_flags = PM_ISPRSTN;
+
+//		asb_m_reg = ASB_H264_S_CTRL;
+//		asb_s_reg = ASB_H264_M_CTRL;
+
+	// in fact, enable/disable clock below may be unnecessary. the kernel's driver
+	// for enabling/disabling the v3d clock
+	clock_on(true);
+	CTimer::Get()->usDelay(1);
+	clock_on(false);
+
+
+//	PM_WRITE(pm_reg, PM_READ(pm_reg) & ~reset_flags);
+
+	printk("before reset %08x", PM_READ(pm_reg)); // should be 0000_1000
+	/* Deassert the resets. */
+	PM_WRITE(pm_reg, PM_READ(pm_reg) | reset_flags);
+	printk("after reset %08x", PM_READ(pm_reg)); // should be 0000_1040
+
+	clock_on(true);
+
+	CTimer::Get()->usDelay(1);
+
+	// master
+	int ret = asb_enable(asb_m_reg);
+	if (!ret)
+		printk("enable master ok");
+	else
+		printk("enable master failed. ret %d", ret);
+
+	// slave
+	ret = asb_enable(asb_s_reg);
+	if (!ret)
+		printk("enable slave ok");
+	else
+		printk("enable slave failed. ret %d", ret);
+}
+
+void CV3D::asb_power_off(void)
+{
+	u32 pm_reg = PM_GRAFX;
+	u32 asb_m_reg = ASB_V3D_M_CTRL;
+	u32 asb_s_reg = ASB_V3D_S_CTRL;
+	u32 reset_flags = PM_V3DRSTN;
+
+	int ret = asb_disable(asb_m_reg);
+	if (!ret)
+		CLogger::Get()->Write (FromKernel, LogNotice, "disable master ok");
+	else
+		CLogger::Get()->Write (FromKernel, LogNotice, "disable master failed. ret %d", ret);
+
+	// slave
+	ret = asb_disable(asb_s_reg);
+	if (!ret)
+		CLogger::Get()->Write (FromKernel, LogNotice, "disable slave ok");
+	else
+		CLogger::Get()->Write (FromKernel, LogNotice, "disable slave failed. ret %d", ret);
+
+	PM_WRITE(pm_reg, PM_READ(pm_reg) & ~reset_flags);
+}
+
+
+void CV3D::power_on(bool on)
+{
+	if (on)
+		asb_power_on();
+	else
+		asb_power_off();
+}
