@@ -79,6 +79,10 @@ TShutdownMode CKernel::Run (void)
 //	int *p = new int(20);
 //	delete p;
 
+	// test memory
+	printk("memory size is %lld MB", m_Memory.GetMemSize()/1024/1024);
+
+
 	int secs = 10;
 	printk("to reboot in %d secs...", secs);
 	m_Timer.MsDelay(secs * 1000);

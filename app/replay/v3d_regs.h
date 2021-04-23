@@ -172,6 +172,8 @@
 # define V3D_MMU_CTL_TLB_STATS_ENABLE                  BIT(1)
 # define V3D_MMU_CTL_ENABLE                            BIT(0)
 
+#define V3D_MMU_PAGE_SHIFT 12
+
 #define V3D_MMU_PT_PA_BASE                             0x01204
 #define V3D_MMU_HIT                                    0x01208
 #define V3D_MMU_MISSES                                 0x0120c

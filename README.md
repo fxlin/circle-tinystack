@@ -2,7 +2,7 @@ xzl:  workflow
 
 load bootloader64 to uSD of rpi4
 
-on dev machine, change code -> make -> sudo make flash
+on *dev* machine, go to the app's dir, change code -> make -> sudo make flash
 
 developing w/ eclipse seems for Linux only (windows is more difficult)
 

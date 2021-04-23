@@ -6,9 +6,11 @@
 #include <circle/bcm2711.h>
 #include <circle/memio.h>
 #include <circle/bcmpropertytags.h>
+#include <circle/memory.h>
 
 #include <linux/kernel.h>
 #include <linux/printk.h>
+#include <linux/delay.h>
 
 #include "v3d.h"
 #include "v3d_regs.h"
@@ -43,8 +45,6 @@ int asb_disable(u32 reg)
 	else
 		return 0;
 }
-
-
 
 void dump_v3d_regs(void)
 {
@@ -190,6 +190,34 @@ void set_pd_states(void)
 	}
 }
 
+static int v3d_mmu_flush_all(void)
+{
+	int ret;
+	unsigned t0 = CTimer::GetClockTicks();
+
+	ret = wait_for(!(V3D_READ(V3D_MMU_CTL) &
+				 V3D_MMU_CTL_TLB_CLEARING), 100);
+	assert(!ret);
+
+	V3D_WRITE(V3D_MMU_CTL, V3D_READ(V3D_MMU_CTL) |
+		  V3D_MMU_CTL_TLB_CLEAR);
+
+	V3D_WRITE(V3D_MMUC_CONTROL,
+		  V3D_MMUC_CONTROL_FLUSH |
+		  V3D_MMUC_CONTROL_ENABLE);
+
+	ret = wait_for(!(V3D_READ(V3D_MMU_CTL) &
+			 V3D_MMU_CTL_TLB_CLEARING), 100);
+
+	assert(!ret);
+
+	ret = wait_for(!(V3D_READ(V3D_MMUC_CONTROL) &
+				 V3D_MMUC_CONTROL_FLUSHING), 100);
+
+	assert(!ret);
+	printk("%s ticks %u", __func__. CTimer::GetClockTicks() - t0);
+	return ret;
+}
 
 // --------------------- cv3d ------------------------ //
 
@@ -217,7 +245,6 @@ void CV3D::clock_on(bool enable)
 		else
 			CLogger::Get()->Write (FromKernel, LogNotice, "set clock state %u", st.nState);
 }
-
 
 boolean CV3D::Init(void)
 {
@@ -249,7 +276,6 @@ boolean CV3D::Init(void)
 	set_pd_states();
 	dump_pd_states();
 
-
 	dump_v3d_regs();
 
 	// will have to turn v3d on via asb, as did in linux
@@ -258,6 +284,32 @@ boolean CV3D::Init(void)
 
 	// read reg again
 	dump_v3d_regs();
+
+	pt_paddr = CMemorySystem::Get()->HeapAllocate(1024 * 4096, HEAP_DMA30);
+	mmu_scratch_paddr = CMemorySystem::Get()->HeapAllocate(4096, HEAP_DMA30);
+	if (pt_paddr && mmu_scratch_paddr)
+		printk("pgtable %08x mmu_scratch_paddr %08x", (u64)pt_paddr,
+				(u64)mmu_scratch_paddr);
+	else
+		printk("bug? failed to alloc");
+
+	// cf: v3d_mmu_set_page_table()
+	V3D_WRITE(V3D_MMU_PT_PA_BASE, (u64)(this->pt_paddr) >> V3D_MMU_PAGE_SHIFT);
+	V3D_WRITE(V3D_MMU_CTL,
+		  V3D_MMU_CTL_ENABLE |
+		  V3D_MMU_CTL_PT_INVALID_ENABLE |
+		  V3D_MMU_CTL_PT_INVALID_ABORT |
+		  V3D_MMU_CTL_PT_INVALID_INT |
+		  V3D_MMU_CTL_WRITE_VIOLATION_ABORT |
+		  V3D_MMU_CTL_WRITE_VIOLATION_INT |
+		  V3D_MMU_CTL_CAP_EXCEEDED_ABORT |
+		  V3D_MMU_CTL_CAP_EXCEEDED_INT);
+	V3D_WRITE(V3D_MMU_ILLEGAL_ADDR,
+		  (u64)(this->mmu_scratch_paddr) >> V3D_MMU_PAGE_SHIFT |
+		  V3D_MMU_ILLEGAL_ADDR_ENABLE);
+	V3D_WRITE(V3D_MMUC_CONTROL, V3D_MMUC_CONTROL_ENABLE);
+
+	v3d_mmu_flush_all();
 
 	return true;
 }
