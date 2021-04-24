@@ -516,6 +516,11 @@
 #define V3D_READ(offset) read32(V3D_HUB_BASE + offset)
 #define V3D_WRITE(offset, val) write32(V3D_HUB_BASE + offset, val)
 
+#define V3D_WRITE_NOTRACE V3D_WRITE
+#define V3D_READ_NOTRACE 	V3D_READ
+
+#define V3D_READ_NOREPLAY	V3D_READ
+
 // tbd
 // #define V3D_BRIDGE_READ(offset) readl(v3d->bridge_regs + offset)
 // #define V3D_BRIDGE_WRITE(offset, val) writel(val, v3d->bridge_regs + offset)
@@ -524,5 +529,9 @@
 
 #define V3D_CORE_READ(core, offset) read32(V3D_CORE_BASE + offset)
 #define V3D_CORE_WRITE(core, offset, val) write32(V3D_CORE_BASE + offset, val)
+
+#define V3D_CORE_WRITE_NOTRACE 	V3D_CORE_WRITE
+#define V3D_CORE_READ_NOTRACE 	V3D_CORE_READ
+
 
 #endif /* V3D_REGS_H */

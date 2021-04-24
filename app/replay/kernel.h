@@ -17,6 +17,11 @@
 #include <circle/logger.h>
 #include <circle/types.h>
 
+#ifdef V3D_LOAD_FROM_FILE
+#include <circle/usb/usbhcidevice.h>
+#include <circle/fs/fat/fatfs.h>
+#endif
+
 #include "v3d.h"
 
 enum TShutdownMode
@@ -50,6 +55,12 @@ private:
 	CLogger			m_Logger;
 	CV3D				m_v3d;
 	CBcmRandomNumberGenerator m_random;
+
+#ifdef V3D_LOAD_FROM_FILE
+	CUSBHCIDevice		m_USBHCI; // xzl: may bloat. to remove later.
+//	CFATFileSystem		m_FileSystem;
+//	CEMMCDevice		m_EMMC;
+#endif
 
 	// TODO: add more members here
 //	CMyClass		m_MyObject;

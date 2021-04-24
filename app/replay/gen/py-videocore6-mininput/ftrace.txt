@@ -1,0 +1,55 @@
+# tracer: nop
+#
+# entries-in-buffer/entries-written: 44/44   #P:4
+#
+#                                _-----=> irqs-off
+#                               / _----=> need-resched
+#                              | / _---=> hardirq/softirq
+#                              || / _--=> preempt-depth
+#                              ||| /     delay
+#           TASK-PID     CPU#  ||||   TIMESTAMP  FUNCTION
+#              | |         |   ||||      |         |
+         python3-770     [001] ....    65.262148: v3d_map_gpu_region: start_page=0x00000020 num_pages=0x00002100 is_map=1
+         python3-770     [001] ....    65.262341: v3d_mmu_flush_begin: dev=0
+         python3-770     [001] ....    65.262344: v3d_access_reg: group=~hub rw=r offset=0x00001200 val=0x060d0c01 core=-1
+         python3-770     [001] ....    65.262345: v3d_access_reg: group=~hub rw=r offset=0x00001200 val=0x060d0c01 core=-1
+         python3-770     [001] ....    65.262346: v3d_access_reg: group=~hub rw=w offset=0x00001200 val=0x060d0c05 core=-1
+         python3-770     [001] ....    65.262347: v3d_access_reg: group=~hub rw=r offset=0x00001200 val=0x060d0c01 core=-1
+         python3-770     [001] ....    65.262348: v3d_access_reg: group=~hub rw=w offset=0x00001000 val=0x00000003 core=-1
+         python3-770     [001] ....    65.262349: v3d_access_reg: group=~hub rw=r offset=0x00001200 val=0x060d0c01 core=-1
+         python3-770     [001] ....    65.262349: v3d_access_reg: group=~hub rw=r offset=0x00001000 val=0x00000001 core=-1
+         python3-770     [001] ....    65.262351: v3d_mmu_flush_end: dev=0
+         python3-770     [001] ....    65.345127: v3d_submit_csd_ioctl: dev=0, CFG5 0x00020000, CFG6 0x001222e0
+         v3d_csd-747     [002] ....    65.345213: v3d_access_reg: group=core rw=w offset=0x00000030 val=0x00000001 core=0
+         v3d_csd-747     [002] ....    65.345216: v3d_access_reg: group=core rw=w offset=0x00000024 val=0x0f0f0f0f core=0
+         v3d_csd-747     [002] ....    65.455618: v3d_dump_gpu_region: start_page=0x00000000 num_pages=0x0000ffff tag=csd_0001
+         v3d_csd-747     [002] ....    65.455649: v3d_submit_csd: dev=0, seqno=1
+         v3d_csd-747     [002] ....    65.455651: v3d_access_reg: group=core rw=w offset=0x00000908 val=0x00010000 core=0
+         v3d_csd-747     [002] ....    65.455652: v3d_access_reg: group=core rw=w offset=0x0000090c val=0x00010000 core=0
+         v3d_csd-747     [002] ....    65.455653: v3d_access_reg: group=core rw=w offset=0x00000910 val=0x0000f010 core=0
+         v3d_csd-747     [002] ....    65.455653: v3d_access_reg: group=core rw=w offset=0x00000914 val=0x00000007 core=0
+         v3d_csd-747     [002] ....    65.455654: v3d_access_reg: group=core rw=w offset=0x00000918 val=0x00020000 core=0
+         v3d_csd-747     [002] ....    65.455654: v3d_access_reg: group=core rw=w offset=0x0000091c val=0x001222e0 core=0
+         v3d_csd-747     [002] ....    65.455655: v3d_access_reg: group=core rw=w offset=0x00000904 val=0x00100000 core=0
+          <idle>-0       [000] d.h1    65.455668: v3d_access_reg: group=~core rw=r offset=0x00000050 val=0x00000080 core=0
+          <idle>-0       [000] d.h1    65.455670: v3d_access_reg: group=~core rw=w offset=0x00000058 val=0x00000080 core=0
+          <idle>-0       [000] d.h1    65.455672: v3d_csd_irq: dev=0, seqno=1
+ v3d_cache_clean-748     [000] ....    65.455703: v3d_cache_clean_begin: dev=0
+ v3d_cache_clean-748     [000] ....    65.455704: v3d_access_reg: group=core rw=w offset=0x00000030 val=0x00000100 core=0
+ v3d_cache_clean-748     [000] ....    65.455706: v3d_wait_for_reg: group=core offset=0x00000030 mask=0x00000001 expected=0x00000000 core=0
+ v3d_cache_clean-748     [000] ....    65.455707: v3d_access_reg: group=~core rw=r offset=0x00000030 val=0x00000000 core=0
+ v3d_cache_clean-748     [000] ....    65.455708: v3d_access_reg: group=core rw=w offset=0x00000030 val=0x00000005 core=0
+ v3d_cache_clean-748     [000] ....    65.455709: v3d_wait_for_reg: group=core offset=0x00000030 mask=0x00000001 expected=0x00000000 core=0
+ v3d_cache_clean-748     [000] ....    65.455710: v3d_access_reg: group=~core rw=r offset=0x00000030 val=0x00000005 core=0
+ v3d_cache_clean-748     [000] ....    65.455743: v3d_access_reg: group=~core rw=r offset=0x00000030 val=0x00000004 core=0
+ v3d_cache_clean-748     [000] ....    65.455744: v3d_cache_clean_end: dev=0
+         python3-770     [001] ....    65.457600: v3d_map_gpu_region: start_page=0x00000020 num_pages=0x00002100 is_map=0
+         python3-770     [001] ....    65.457623: v3d_mmu_flush_begin: dev=0
+         python3-770     [001] ....    65.457625: v3d_access_reg: group=~hub rw=r offset=0x00001200 val=0x060d0c01 core=-1
+         python3-770     [001] ....    65.457626: v3d_access_reg: group=~hub rw=r offset=0x00001200 val=0x060d0c01 core=-1
+         python3-770     [001] ....    65.457627: v3d_access_reg: group=~hub rw=w offset=0x00001200 val=0x060d0c05 core=-1
+         python3-770     [001] ....    65.457627: v3d_access_reg: group=~hub rw=r offset=0x00001200 val=0x060d0c01 core=-1
+         python3-770     [001] ....    65.457628: v3d_access_reg: group=~hub rw=w offset=0x00001000 val=0x00000003 core=-1
+         python3-770     [001] ....    65.457629: v3d_access_reg: group=~hub rw=r offset=0x00001200 val=0x060d0c01 core=-1
+         python3-770     [001] ....    65.457630: v3d_access_reg: group=~hub rw=r offset=0x00001000 val=0x00000001 core=-1
+         python3-770     [001] ....    65.457631: v3d_mmu_flush_end: dev=0

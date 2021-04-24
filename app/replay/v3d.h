@@ -84,20 +84,21 @@ void dump_pd_states(void);
 class CV3D : public CDevice
 {
 public:
-	CV3D (void);
+	CV3D (CInterruptSystem *pInterruptSystem = 0);
 	~CV3D (void);
 
 	boolean Init(void);
 	void power_on(bool on = true);
+	int Replay(void);
 
 private:
-	uintptr  m_nBaseAddress;
+//	uintptr  m_nBaseAddress;
 	void asb_power_on(void);
 	void asb_power_off(void);
 	void clock_on(bool enable =  true);
-	void *pt_paddr;
-	void *mmu_scratch_paddr;
 //	CLogger			m_Logger;
+
+	CInterruptSystem *m_pInterruptSystem;
 };
 
 

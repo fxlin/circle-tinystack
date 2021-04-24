@@ -1,0 +1,5 @@
+test_v3d_replay returns 0
+[  310.342962] [drm] --- replay starts --- 
+[  310.394341] [drm] loaded mem dump. 1060 KB in 3 ms
+[  310.394621] [drm] --- done. 16 records replayed. 51 ms(load 3 irq 0 map 48 wait 0 waitreg 0 reg 0)--- 
+[  310.399297] [drm] freed 1 shmem objs

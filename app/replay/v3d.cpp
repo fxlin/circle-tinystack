@@ -7,15 +7,31 @@
 #include <circle/memio.h>
 #include <circle/bcmpropertytags.h>
 #include <circle/memory.h>
+#include <circle/util.h>
 
 #include <linux/kernel.h>
+#include <linux/list.h>
 #include <linux/printk.h>
-#include <linux/delay.h>
+//#include <linux/delay.h>	// this also includes sleep, bad.
+#include <linux/atomic.h>
+#include <linux/slab.h> // kmalloc
+#include <linux/errno.h>
 
+#include "elf.h"
 #include "v3d.h"
 #include "v3d_regs.h"
+#include "v3d_replay_linux.h"
+
+// from linux/delay.cpp
+static void udelay (unsigned long usecs)
+{
+	CTimer::Get ()->usDelay (usecs);
+}
 
 static const char * FromKernel = "v3d";
+
+static u32 *pt_paddr = NULL;
+static void *mmu_scratch_paddr = NULL;
 
 // cf: bcm2835_asb_enable
 int asb_enable(u32 reg)
@@ -122,7 +138,6 @@ void set_clk_states(void)
 	}
 }
 
-
 /* These power domain indices are the firmware interface's indices
  * minus one.
  * linux: raspbeerrypi-power.h
@@ -190,6 +205,13 @@ void set_pd_states(void)
 	}
 }
 
+/* Note: All PTEs for the 1MB superpage must be filled with the
+ * superpage bit set.
+ */
+#define V3D_PTE_SUPERPAGE BIT(31) // xzl: pte format: pfns shifted to lower bits
+#define V3D_PTE_WRITEABLE BIT(29)
+#define V3D_PTE_VALID BIT(28)
+
 static int v3d_mmu_flush_all(void)
 {
 	int ret;
@@ -215,13 +237,942 @@ static int v3d_mmu_flush_all(void)
 				 V3D_MMUC_CONTROL_FLUSHING), 100);
 
 	assert(!ret);
-	printk("%s ticks %u", __func__. CTimer::GetClockTicks() - t0);
+	printk("%s ticks %u", __func__, CTimer::GetClockTicks() - t0);
 	return ret;
+}
+
+// for a contig phys region,
+// map @phys to gpu @virt
+void v3d_mmu_insert_ptes(u32 phys, u32 page /*gpu virt*/, u32 npages)
+{
+	u32 page_prot = V3D_PTE_WRITEABLE | V3D_PTE_VALID;
+
+	u32 page_address = phys >> V3D_MMU_PAGE_SHIFT;
+	u32 pte = page_prot | page_address; // xzl: encoding phys addr
+	u32 i;
+
+	printk("xzl: %s: phys %08x", __func__, phys);
+
+	assert(!(page_address + (PAGE_SIZE >> V3D_MMU_PAGE_SHIFT) >=
+				 BIT(24)));
+
+	// xzl: within one phys contig region, increment pfn (pte+i)
+	for (i = 0; i < npages; i++)
+		pt_paddr[page++] = pte + i;
+
+	if (v3d_mmu_flush_all())
+		printk("MMU flush timeout\n");
+}
+
+void v3d_mmu_remove_ptes(u32 virt, u32 npages)
+{
+	u32 page;
+
+	for (page = (virt >> V3D_MMU_PAGE_SHIFT); page < page + npages; page++)
+		pt_paddr[page] = 0;
+
+	v3d_mmu_flush_all();
+}
+
+// --------------------- file io ------------------------ //
+// Circle's own fatfs cannot seek
+// #include <circle/fs/fat/fatfs.h>
+// CFATFileSystem * the_fs = NULL;
+
+#include <fatfs/ff.h>
+
+FATFS the_fs;
+
+/* wrapper around the fatfs */
+
+#if 0 // around the circle's fatfs
+// return 0 on failure.
+static unsigned file_open(const char *path) {
+	BUG_ON(!the_fs || !path);
+	return the_fs->FileOpen(path);
+}
+
+// auto increments offset
+// return 0: eof; non-zero: # of bytes read
+static unsigned  file_read(unsigned file,
+		void *data, unsigned int size)
+{
+	unsigned ret;
+	BUG_ON(!the_fs);
+	ret = the_fs->FileRead(file, data, size);
+	BUG_ON(ret == 0xFFFFFFFF); // "general failure"
+
+	return ret;
+}
+
+static void file_close(unsigned file) {
+	unsigned ret;
+
+	BUG_ON(!the_fs);
+
+	ret = the_fs->FileClose(file);
+	BUG_ON(!ret); // 0 on failure
+}
+#endif
+
+//typedef FIL file;
+
+
+// auto increments offset
+// return 0: eof; non-zero: # of bytes read
+//static unsigned  file_read(unsigned file,
+//		void *data, unsigned int size)
+//{
+//	unsigned ret;
+//	BUG_ON(!the_fs);
+//	ret = the_fs->FileRead(file, data, size);
+//	BUG_ON(ret == 0xFFFFFFFF); // "general failure"
+//
+//	return ret;
+//}
+
+#ifdef V3D_LOAD_FROM_FILE
+// return 0 on ok
+static int elf_read(FIL *fp, void *buf, u32 len, u32 pos)
+{
+	FRESULT res;
+	u32 ll = 0;
+
+	assert(fp);
+	res = f_lseek(fp, pos);
+	if (res != FR_OK)
+		return -1;
+
+	res = f_read(fp, buf, len, &ll);
+	if (res != FR_OK || len != ll)
+		return -1;
+}
+#endif
+
+// return 0 on ok
+static int elf_read_img(const char *elfbase, ssize_t elfsize,
+		void *buf, u32 len, u32 pos)
+{
+	BUG_ON(!elfbase || !buf || pos + len >= elfsize);
+	memcpy(buf, elfbase + pos, len);
+	return 0;
+}
+
+//static void file_close(FIL *fp) {
+//	FRESULT res;
+//
+//	assert(fp);
+//
+//	res = f_close(fp);
+//	assert(res == FR_OK);
+//}
+
+// --------------------- replay ------------------------ //
+// bookkeeping all live GPU regions (BO)
+struct gpu_region {
+	u32 start_page; // gpu
+	u32 num_pages; // gpu
+	u32 num_bytes_dump;
+//	struct drm_gem_shmem_object * shmem; // cpu kernel
+	u32 phys; // cpu, identity mapping
+	u32 type; // from bo type
+	struct list_head region_list;
+};
+
+#define MAX_RECORDS 				65536		// failsafe
+#define DEFAULT_DELAY_US		5000 	// per reg access.
+#define WAIT_FOR_IRQ_TIMEOUT_US (5 * 1000 * 1000)
+
+// xzl: from linux list.h
+#define LIST_HEAD_INIT(name) { &(name), &(name) }
+#define LIST_HEAD(name) \
+	struct list_head name = LIST_HEAD_INIT(name)
+
+// For replay: BOs we've mapped during replay. will free at the end of replay
+static LIST_HEAD(the_gpu_regions);
+//static LIST_HEAD(the_shmem_freelist); // for caching shmem allocation
+
+// ret 0 on ok
+int add_gpu_region(u32 start_page, struct gpu_region *r)
+{
+	int ret = 0;
+	struct list_head *c;
+	struct gpu_region *region;
+
+	assert(r);
+
+	list_for_each(c, &the_gpu_regions) {
+		region = list_entry(c, struct gpu_region, region_list);
+		if (region->start_page == r->start_page) {
+			ret = -1;
+			goto out;
+		}
+	}
+	list_add(&r->region_list, &the_gpu_regions);
+out:
+	return ret;
+}
+
+// ret the ptr on ok; NULL no found.
+// caller shall free the gpu region struct??
+struct gpu_region * _lookup_gpu_region(u32 start_page, bool remove)
+{
+	struct list_head *c, *tmp;
+	struct gpu_region *region;
+
+	list_for_each_safe(c, tmp, &the_gpu_regions) {
+		region = list_entry(c, struct gpu_region, region_list);
+		if (region->start_page == start_page) {
+			if (remove)
+				list_del(c); // unlink it
+			return region;
+		}
+	}
+	return NULL;
+}
+
+struct gpu_region *remove_gpu_region(u32 start_page)
+{
+	return _lookup_gpu_region(start_page, true);
+}
+
+struct gpu_region * lookup_gpu_region(u32 start_page)
+{
+	return _lookup_gpu_region(start_page, false);
+}
+
+//int v3d_replay_irqcnt = 0;
+atomic_t v3d_replay_irqcnt = ATOMIC_INIT(0); // must be atomic
+
+static void v3d_replay_cleanup(void) {
+	// XXX free all gpu regions??
+}
+
+u64 ktime_get_ns()
+{
+	u32 sec, us; // no ns?
+
+	CTimer::Get()->GetUniversalTime(&sec, &us);
+	return sec * 1000 * 1000 * 1000 + us * 1000;
+}
+
+#ifdef V3D_LOAD_FROM_FILE
+/* load all segs from an elf file. assuming the GPU mappings exist
+ * @filesz: out, total file bytes loaded
+ * cf: load_elf_library
+ * return: error code. 0 okay
+ * */
+static int xzl_load_gpu_regions_elf(FIL *file, ssize_t *filesz)
+{
+	struct elf_phdr *elf_phdata;
+	struct elf_phdr *eppnt;
+	int retval, error, i, j;
+	struct elfhdr elf_ex;
+
+	*filesz = 0;
+
+	error = -ENOEXEC;
+	retval = elf_read(file, &elf_ex, sizeof(elf_ex), 0);
+	if (retval != 0)
+		goto out;
+
+	if (memcmp(elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
+		goto out;
+
+	/* First of all, some simple consistency checks */
+	if (elf_ex.e_machine != ELF_ARCH) /* xzl: add more checks? */
+		goto out;
+
+	/* Now read in all of the header information */
+	j = sizeof(struct elf_phdr) * elf_ex.e_phnum;
+	/* j < ELF_MIN_ALIGN because elf_ex.e_phnum <= 2 */ //xzl-- matters?
+
+	error = -ENOMEM;
+	elf_phdata = (struct elf_phdr *)kmalloc(j, GFP_KERNEL);
+	if (!elf_phdata)
+		goto out;
+
+	eppnt = elf_phdata;
+	error = -ENOEXEC;
+	retval = elf_read(file, eppnt, j, elf_ex.e_phoff);
+	if (retval < 0)
+		goto out_free_ph;
+
+	// xzl: @eppnt: buf for all prog headers @j: sz of all program headers
+	for (i = 0; i<elf_ex.e_phnum; i++) {
+		u32 start_page;
+		char *addr;
+		struct gpu_region *rr;
+
+		BUG_ON(eppnt[i].p_type != PT_LOAD);
+
+		start_page = eppnt[i].p_vaddr >> V3D_MMU_PAGE_SHIFT;
+
+		/* the GPU mem region must have been mapped */
+#if 0
+		for (j = 0; j < num_gpu_regions; j++) {
+			if (the_gpu_regions[j].start_page == start_page) {
+				shmem_obj = the_gpu_regions[j].shmem;
+				break;
+			}
+		}
+		if (j == num_gpu_regions) {
+					DRM_ERROR("BUG? try to load a GPU region unmapped. start_page=%08x",
+							start_page);
+					goto out_free_ph;
+				}
+#endif
+
+		rr = lookup_gpu_region(start_page);
+			if (!rr) {
+				printk("BUG? try to load a GPU region unmapped. start_page=%08x",
+						start_page);
+				goto out_free_ph;
+			}
+			addr = (char *)(long)(rr->phys); // phys is virt
+
+		if ((rr->num_pages << V3D_MMU_PAGE_SHIFT) != eppnt[i].p_memsz) { /* sanity check */
+			printk("sz %lx != memsz %llx filesz %llx",
+					rr->num_pages << V3D_MMU_PAGE_SHIFT, eppnt[i].p_memsz,
+					eppnt[i].p_filesz);
+			goto out_free_ph;
+		}
+
+		/* map GPU BO to kernel space, upload mem contents */
+		BUG_ON(!addr);
+		retval = elf_read(file, addr, eppnt[i].p_filesz,
+				eppnt[i].p_offset/*file offset*/);
+
+		if (retval) {
+			printk("elf_read failed. why?");
+			continue;
+		}
+
+		*filesz += eppnt[i].p_filesz;
+
+		printk("loadelf: vaddr %08llx memsz %08llx filesz %08llx",
+				eppnt[i].p_vaddr, eppnt[i].p_memsz, eppnt[i].p_filesz);
+	}
+
+	error = 0;
+
+out_free_ph:
+	kfree(elf_phdata);
+out:
+	return error;
+}
+#endif // #ifdef V3D_LOAD_FROM_FILE
+
+// from mem image
+// elfsize: in
+
+static int xzl_load_gpu_regions_elfimg(const char *elfbuf, ssize_t elfsize)
+{
+	struct elf_phdr *elf_phdata;
+	struct elf_phdr *eppnt;
+	int retval, error, i, j;
+	struct elfhdr elf_ex;
+
+	error = -ENOEXEC;
+	retval = elf_read_img(elfbuf, elfsize, &elf_ex, sizeof(elf_ex), 0);
+	if (retval != 0)
+		goto out;
+
+	if (memcmp(elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
+		goto out;
+
+	/* First of all, some simple consistency checks */
+	if (elf_ex.e_machine != ELF_ARCH) /* xzl: add more checks? */
+		goto out;
+
+	/* Now read in all of the header information */
+	j = sizeof(struct elf_phdr) * elf_ex.e_phnum;
+	/* j < ELF_MIN_ALIGN because elf_ex.e_phnum <= 2 */ //xzl-- matters?
+
+	error = -ENOMEM;
+	elf_phdata = (struct elf_phdr *)kmalloc(j, GFP_KERNEL);
+	if (!elf_phdata)
+		goto out;
+
+	eppnt = elf_phdata;
+	error = -ENOEXEC;
+	retval = elf_read_img(elfbuf, elfsize, eppnt, j, elf_ex.e_phoff);
+	if (retval < 0)
+		goto out_free_ph;
+
+	// xzl: @eppnt: buf for all prog headers @j: sz of all program headers
+	for (i = 0; i<elf_ex.e_phnum; i++) {
+		u32 start_page;
+		char *addr;
+		struct gpu_region *rr;
+
+		BUG_ON(eppnt[i].p_type != PT_LOAD);
+
+		start_page = eppnt[i].p_vaddr >> V3D_MMU_PAGE_SHIFT;
+
+		/* the GPU mem region must have been mapped */
+		rr = lookup_gpu_region(start_page);
+			if (!rr) {
+				printk("BUG? try to load a GPU region unmapped. start_page=%08x",
+						start_page);
+				goto out_free_ph;
+			}
+			addr = (char *)(long)(rr->phys); // phys is virt
+
+		/* sanity check */
+		if ((rr->num_pages << V3D_MMU_PAGE_SHIFT) != eppnt[i].p_memsz) {
+			printk("sz %lx != memsz %llx filesz %llx",
+					rr->num_pages << V3D_MMU_PAGE_SHIFT, eppnt[i].p_memsz,
+					eppnt[i].p_filesz);
+			goto out_free_ph;
+		}
+
+		/* map GPU BO to kernel space, upload mem contents */
+		BUG_ON(!addr);
+		retval = elf_read_img(elfbuf, elfsize, addr, eppnt[i].p_filesz,
+				eppnt[i].p_offset/*file offset*/);
+
+		if (retval) {
+			printk("elf_read failed. why?");
+			continue;
+		}
+
+//		*filesz += eppnt[i].p_filesz;
+
+		printk("loadelf: vaddr %08llx memsz %08llx filesz %08llx",
+				eppnt[i].p_vaddr, eppnt[i].p_memsz, eppnt[i].p_filesz);
+	}
+
+	error = 0;
+
+out_free_ph:
+	kfree(elf_phdata);
+out:
+	return error;
+}
+/* on success: return 0. failure: return neg */
+static int v3d_replay(const struct record_entry *records,
+		const char * filepath) {
+	unsigned int counter = 0;
+	int ret = 0;
+	u64 ts_start, ts_end, total_load_ns = 0, total_irq_ns = 0, total_map_ns = 0;
+	u64 total_wait_us = 0, total_waitreg_us = 0; // artificial delay, not including irq wait
+	u64 total_reg_ns = 0;
+
+//	mb();
+
+	printk("--- replay starts --- ");
+
+	ts_start = ktime_get_ns();
+
+	for (;;) {
+		switch (records->type) {
+		case type_access_reg:
+		{
+			const char rw = records->entry_access_reg.rw;
+			s64 delay = records->delay_after_us;
+			int expected;
+			u64 t0;
+
+			t0 = ktime_get_ns(); // can be costly?
+
+			if (!strncmp(records->entry_access_reg.group, "hub", 3)) {
+				if (rw == 'w')
+					V3D_WRITE_NOTRACE(records->entry_access_reg.offset,
+							records->entry_access_reg.val);
+				else { /* 'r' or 'R' */
+					u32 val = V3D_READ_NOTRACE(records->entry_access_reg.offset);
+					if (val != records->entry_access_reg.val) { // mismatch
+						if (rw == 'R') {
+							printk("%d: ignore mismatched reads. actual 0x%08x expected 0x%08x. comment %s",
+									counter, val, records->entry_access_reg.val,
+									records->comment ? records->comment : "(n/a)");
+							// return -1;  // unmatched read val
+						} else if (rw == 'r') { //
+							printk("%d: bad. hub mismatched reads. actual 0x%08x expected 0x%08x. comment %s",
+									counter, val, records->entry_access_reg.val,
+									records->comment ? records->comment : "(n/a)");
+						} else {
+							printk("bug? rw=%c", rw);
+							ret = -2;
+							goto done;
+						}
+					} // mismatch
+				}
+			} else if (!strncmp(records->entry_access_reg.group, "core", 4)) {
+				BUG_ON(records->entry_access_reg.core != 0); // we only support core==0
+				if (rw == 'w')
+					V3D_CORE_WRITE_NOTRACE(records->entry_access_reg.core,
+							records->entry_access_reg.offset,
+							records->entry_access_reg.val);
+				else {
+					u32 val = V3D_CORE_READ_NOTRACE(records->entry_access_reg.core,
+							records->entry_access_reg.offset);
+					if (val != records->entry_access_reg.val) {
+						if (rw == 'r')
+							printk("%d: bad. core mismatched reads. actual 0x%08x expected 0x%08x. comment %s",
+									counter, val, records->entry_access_reg.val,
+									records->comment ? records->comment : "(n/a)");
+						else if (rw == 'R')
+							printk("%d: ignore core mismatched reads. actual 0x%08x expected 0x%08x. comment %s",
+										counter, val, records->entry_access_reg.val,
+										records->comment ? records->comment : "(n/a)");
+						else {
+							ret = -2;
+							goto done;
+						}
+					}
+				}
+			} else {
+				printk("gca or bridge? unsupported reg types.");
+				ret = -1;
+				goto done;
+			}
+
+			total_reg_ns += ktime_get_ns() - t0;
+
+			if (delay > REPLAY_DELAY_BASE_US) {
+				udelay(delay);
+				total_wait_us += delay;
+			} else if (delay == REPLAY_DELAY_WAIT_SHORT) {
+				udelay(500);
+				total_wait_us += 500;
+			} else if (delay == REPLAY_DELAY_WAIT_NORMAL) {
+				udelay(1 * 1000);		// 1ms
+				total_wait_us += 1000;
+			} else if (delay == REPLAY_DELAY_WAIT_LONG) {
+				udelay(10 * 1000); 	// 10 ms
+				total_wait_us += 10 * 1000;
+			} else if (delay <= REPLAY_DELAY_IRQ_BCL /*-1*/) {
+				static const char *irq_src[] = {"bcl","rcl","csd","tfu"};
+				const char * src = irq_src[-delay-1];
+				u64 t0, t1, ms;
+				int ret;
+
+				expected = atomic_read(&v3d_replay_irqcnt) + 1;
+
+				t0 = ktime_get_ns();
+				// uses usleep
+#if 0
+				ret = (wait_for((atomic_read(&v3d_replay_irqcnt) == expected),
+						WAIT_FOR_IRQ_TIMEOUT_US/1000 /*ms*/));
+#else
+				{ // udelay, spin waiting
+					int k, cur;
+					int iter = WAIT_FOR_IRQ_TIMEOUT_US / 20;
+					printk("wait for irq (delay=%lld)", delay);
+					for (k = 0; k < iter; k++) { // XXX spin wait. this is bad.
+						cur = atomic_read(&v3d_replay_irqcnt);
+						if (cur == expected)
+							break;
+						BUG_ON(cur > expected);
+						udelay(20);
+					}
+					if (k == iter)
+						ret = -1;
+					else
+						ret = 0;
+				}
+#endif
+				t1 = ktime_get_ns();
+				ms = (t1-t0)/1000/1000;
+				total_irq_ns += (t1-t0);
+
+				if (ret)
+					printk("bug? wait for irq %s timeout (around %lld ms)", src, ms);
+				else
+					printk("wait for irq %s okay. (around %lld ms)", src, ms);
+			}	// else no delay
+			break;
+		}
+		case type_wait_for_reg:
+		{
+			// alias
+			const char * group = records->entry_wait_for_reg.group;
+			u32 offset = records->entry_wait_for_reg.offset;
+			u32 mask = records->entry_wait_for_reg.mask;
+			u32 expected = records->entry_wait_for_reg.expected;
+			int core = records->entry_wait_for_reg.core;
+
+			u64 t1 = ktime_get_ns();
+
+			if (!strncmp(group, "hub", 3)) {
+				BUG_ON(core != -1);
+				if (wait_for(((V3D_READ_NOREPLAY(offset) & mask) == expected),
+						100 /* hard coded XXX */)) {
+					printk("bad. timeout. comment %s. quit replay \n",
+							records->comment ? records->comment : "(n/a)");
+					ret = -1;
+					goto done;
+				}
+			} else if (!strncmp(group, "core", 4)) {
+				BUG_ON(core != 0); // we only support core==0
+				if (wait_for(
+						((V3D_CORE_READ_NOTRACE(core, offset) & mask) == expected),
+						100 /* hard coded XXX */)) {
+					printk("bad. timeout. comment %s. quit replay \n",
+							records->comment ? records->comment : "(n/a)");
+					ret = -1;
+					goto done;
+				}
+			} else {
+				printk("gca or bridge? unsupported reg types.");
+				ret = -1;
+				goto done;
+			}
+
+			total_waitreg_us += (ktime_get_ns() - t1) / 1000;
+		}
+		break;
+		case type_map_gpu_mem:
+			if (records->entry_map_gpu_mem.is_map) {
+				/* map a mem region to GPU. cr a shmem obj, allocate phys mem,
+				 * and set GPU ptes */
+				u64 t0, t1;
+				u32 start_page = records->entry_map_gpu_mem.start_page;
+				u32 num_pages = records->entry_map_gpu_mem.num_pages;
+
+				t0 = ktime_get_ns();
+
+#if 0
+				struct list_head *c;
+
+				/* xzl: below can be costly. XXX reuse them in one replay session XXX */
+				list_for_each(c, &the_shmem_freelist) {
+					shmem_obj = list_entry(c, struct drm_gem_shmem_object, madv_list);
+					if (shmem_obj->base.size == num_pages << V3D_MMU_PAGE_SHIFT) {
+						list_del(c);
+						break;
+					}
+				}
+
+				if (c == &the_shmem_freelist) { /* miss in freelist, alloc a new one*/
+					shmem_obj = drm_gem_shmem_create(&v3d->drm,
+											num_pages << V3D_MMU_PAGE_SHIFT);
+					BUG_ON(!shmem_obj);
+					/* for the shmem region, allocate the underneath phys mem.
+					 * the result is a sgt */
+					sgt = drm_gem_shmem_get_pages_sgt(&shmem_obj->base);
+					BUG_ON(!sgt);
+				}
+#endif
+
+				u32 phys;
+				void *p = CMemorySystem::HeapAllocate(num_pages * 4096, HEAP_DMA30);
+				BUG_ON(!p || ((u64)p & (PAGE_SIZE - 1))); // must be page aligned
+
+				phys = (u32)(u64)p;
+
+//				t1 = ktime_get_ns();
+
+				/* xzl: the following is cheap */
+
+				/* instead of alloc GPU addr via drm_mm, directly use the
+				 * recorded GPU addr */
+				v3d_mmu_insert_ptes(phys, start_page, num_pages);
+
+				// bookkeep the gpu region
+				{
+					int ret;
+					struct gpu_region * r =
+							(struct gpu_region *)kmalloc(sizeof(*r), GFP_KERNEL);
+
+					r->start_page = start_page;
+					r->num_pages = num_pages;
+					r->phys = phys;
+					ret = add_gpu_region(start_page, r);
+					if (ret) { /* 0 means okay */
+						printk("gpu mem already mapped? ret %d start_page 0x%08x skip",
+								ret, start_page);
+						continue;
+					}
+				}
+				printk("map GPU mem start_page %08x num_pages 0x%08x", start_page,
+						num_pages);
+				t1 = ktime_get_ns();
+				total_map_ns += (t1-t0);
+			} else {  // unmap
+				u64 t0, t1;
+				struct gpu_region * rr;
+
+				t0 = ktime_get_ns();
+
+				rr = remove_gpu_region(records->entry_map_gpu_mem.start_page);
+				BUG_ON(!rr || rr->num_pages != records->entry_map_gpu_mem.num_pages);
+
+				// return shmem to freelist. don't destroy
+//				list_add(&rr->shmem->madv_list, &the_shmem_freelist);
+				CMemorySystem::HeapFree((void *)(u64)(rr->phys));
+				kfree(rr);
+
+				v3d_mmu_remove_ptes(
+						records->entry_map_gpu_mem.start_page,
+						records->entry_map_gpu_mem.num_pages);
+
+				t1 = ktime_get_ns();
+				total_map_ns += (t1-t0);
+			}
+			break;
+		case type_write_gpu_mem:
+		{
+			void *addr = NULL;
+			struct gpu_region * rr = NULL;
+			u32 start_page = records->entry_write_gpu_mem.start_page;
+			u32 num_pages = records->entry_write_gpu_mem.sz >> V3D_MMU_PAGE_SHIFT;
+			// write size must be page aligned as of now
+			BUG_ON(records->entry_write_gpu_mem.sz &
+					((1<<V3D_MMU_PAGE_SHIFT)-1));
+
+			/* the GPU mem region must have been mapped */
+			rr = lookup_gpu_region(start_page);
+			BUG_ON(!rr || rr->num_pages != num_pages);
+			addr = (void *)(u64)(rr->phys);
+
+			printk("bo kernel CPU vaddr is %lx 0x%08x pages",
+					(unsigned long)addr, num_pages);
+			memcpy(addr, records->entry_write_gpu_mem.buf,
+					records->entry_write_gpu_mem.sz);
+			// flush? sync DMA memory?
+		}
+		break;
+		case type_write_gpu_mem_fromfile:
+#ifdef V3D_LOAD_FROM_FILE
+		{
+//			struct file *fp;
+			FIL f;
+			FRESULT fres;
+
+			u64 t0, t1;
+			ssize_t filesz;
+			char * fname;
+
+			t0 = ktime_get_ns();
+			fname = (char *)kmalloc(256, GFP_KERNEL);
+
+			BUG_ON(!fname);
+
+			snprintf(fname, 256, "%smem_%s.elf", filepath,
+					records->entry_write_gpu_mem_fromfile.tag);
+//			fp = file_open(fname, O_RDONLY, 0 /* ignored */);
+
+			printk("open file %s...", fname);
+
+			fres = f_open(&f, fname, FA_READ | FA_OPEN_EXISTING);
+			if (fres != FR_OK) {
+				printk("cannot open %s for replay. quit", fname);
+				ret = -1;
+				kfree(fname);
+				goto done;
+			} else {
+				xzl_load_gpu_regions_elf(&f, &filesz);
+				fres = f_close(&f);
+				assert(fres == FR_OK);
+				kfree(fname);
+				t1 = ktime_get_ns();
+				printk("loaded mem dump. %zd KB in %lld ms",
+						filesz/1000, (t1-t0)/1000/1000);
+				total_load_ns += (t1-t0);
+			}
+		}
+#else // load from mem image
+		{
+			u64 t0, t1;
+			const char *elfbuf;
+			ssize_t elfsize;
+
+			extern const char _binary_mem_csd_0001_elf_start;
+			extern unsigned long _binary_mem_csd_0001_elf_size;
+
+			elfsize = _binary_mem_csd_0001_elf_size;
+
+			t0 = ktime_get_ns();
+
+			if (!strcmp(records->entry_write_gpu_mem_fromfile.tag, "csd_0001")) {
+				elfbuf = &_binary_mem_csd_0001_elf_start;
+				printk("open elf img, size %08lx...", _binary_mem_csd_0001_elf_size);
+
+				int res = xzl_load_gpu_regions_elfimg(elfbuf, elfsize);
+
+				BUG_ON(res != 0);
+				t1 = ktime_get_ns();
+				printk("loaded mem dump. %zd KB in %lld ms",
+						elfsize/1000, (t1-t0)/1000/1000);
+				total_load_ns += (t1-t0);
+			} else
+				BUG();
+		}
+#endif
+		break;
+		case type_eof:
+			ts_end = ktime_get_ns();
+			printk("--- done. %d records replayed. %lld ms"
+					"(load %lld irq %lld map %lld wait %lld waitreg %lld reg %lld)--- ",
+					counter,
+					(ts_end - ts_start) / 1000 / 1000,
+					total_load_ns/1000/1000, total_irq_ns/1000/1000,
+					total_map_ns/1000/1000, total_wait_us / 1000,
+					total_waitreg_us/1000, total_reg_ns/1000/1000 );
+			ret = 0;
+			goto done;
+		default:
+			ret = -10;
+			printk("unrecognized type, abort");
+			goto done;
+			break;
+		} // switch
+
+		records++;
+		if (counter == MAX_RECORDS) { // failsafe.
+			printk("reached # max records = %d. abort", counter);
+			ret = -1;
+			goto done;
+		}
+		counter++;
+	} // for(;;)
+
+done:
+//	v3d_is_replay_xzl = 0;
+//	v3d_is_recording_xzl = v3d_is_recording_saved;
+//	mb();
+	return ret;
+}
+
+enum irqreturn {
+	IRQ_NONE		= (0 << 0),
+	IRQ_HANDLED		= (1 << 0),
+	IRQ_WAKE_THREAD		= (1 << 1),
+};
+
+typedef enum irqreturn irqreturn_t;
+
+
+static irqreturn_t
+v3d_hub_irq(void *arg)
+{
+	u32 intsts;
+	irqreturn_t status = IRQ_NONE;
+
+	intsts = V3D_READ(V3D_HUB_INT_STS);
+
+	/* Acknowledge the interrupts we're handling here. */
+	V3D_WRITE(V3D_HUB_INT_CLR, intsts);
+
+	if (intsts & V3D_HUB_INT_TFUC) {
+		printk("xzl: a hub tfuc irq");
+		status = IRQ_HANDLED;
+	}
+
+	// xzl: mmu irq for err? no tracept. XXX: these are executed in replay
+	if (intsts & (V3D_HUB_INT_MMU_WRV |
+		      V3D_HUB_INT_MMU_PTI |
+		      V3D_HUB_INT_MMU_CAP)) {
+		u32 axi_id = V3D_READ(V3D_MMU_VIO_ID);
+		int va_width = 32; // xzl: is this right?
+		int ver = 42; // v3d 42?
+
+		u64 vio_addr = ((u64)V3D_READ(V3D_MMU_VIO_ADDR) <<
+				(va_width - 32));
+		static const char *const v3d41_axi_ids[] = {
+			"L2T",
+			"PTB",
+			"PSE",
+			"TLB",
+			"CLE",
+			"TFU",
+			"MMU",
+			"GMP",
+		};
+		const char *client = "?";
+		static int logged_error;
+
+		V3D_WRITE(V3D_MMU_CTL, V3D_READ(V3D_MMU_CTL)); // xzl: why this? clear status?
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
+		if (ver >= 41) {
+			axi_id = axi_id >> 5;
+			if (axi_id < ARRAY_SIZE(v3d41_axi_ids))
+				client = v3d41_axi_ids[axi_id];
+		}
+
+		if (!logged_error)
+		printk("MMU error from client %s (%d) at 0x%llx%s%s%s\n",
+			client, axi_id, (long long)vio_addr,
+			((intsts & V3D_HUB_INT_MMU_WRV) ?
+			 ", write violation" : ""),
+			((intsts & V3D_HUB_INT_MMU_PTI) ?
+			 ", pte invalid" : ""),
+			((intsts & V3D_HUB_INT_MMU_CAP) ?
+			 ", cap exceeded" : ""));
+		logged_error = 1;
+		status = IRQ_HANDLED;
+	}
+
+	return status;
+}
+
+
+//irqreturn_t v3d_irq(void *arg)
+void v3d_irq(void *arg)
+{
+	u32 intsts;
+	int status = -1;
+//	int irq = ARM_IRQ_V3D;
+
+	intsts = V3D_CORE_READ(0, V3D_CTL_INT_STS);
+
+	/* Acknowledge the interrupts we're handling here. */
+	V3D_CORE_WRITE(0, V3D_CTL_INT_CLR, intsts);
+
+	if (intsts & V3D_INT_OUTOMEM) {
+			/* Note that the OOM status is edge signaled, so the
+			 * interrupt won't happen again until the we actually
+			 * add more memory.  Also, as of V3D 4.1, FLDONE won't
+			 * be reported until any OOM state has been cleared.
+			 */
+			printk("xzl: overflow mem. skip");
+			status = IRQ_HANDLED;
+		}
+
+		if (intsts & V3D_INT_FLDONE) { // bcl
+			printk("xzl: a bcl irq");
+			status = IRQ_HANDLED;
+		}
+
+		if (intsts & V3D_INT_FRDONE) {  // rcl
+			printk("xzl: a rcl irq");
+			status = IRQ_HANDLED;
+		}
+
+		if (intsts & V3D_INT_CSDDONE) {
+			printk("xzl: a csd irq");
+			status = IRQ_HANDLED;
+		}
+
+		/* We shouldn't be triggering these if we have GMP in
+		 * always-allowed mode.
+		 */
+		if (intsts & V3D_INT_GMPV)
+			printk("GMP violation\n");
+
+		/* V3D 4.2 wires the hub and core IRQs together, so if we &
+		 * didn't see the common one then check hub for MMU IRQs.
+		 */
+		if (status == IRQ_NONE)
+			status = v3d_hub_irq(arg);
+
+		// too many msgs
+	//	DRM_INFO("xzl: that's all about irq. signal fence");
+
+		atomic_inc(&v3d_replay_irqcnt);
+		DataMemBarrier();
+//		return status;
 }
 
 // --------------------- cv3d ------------------------ //
 
-CV3D::CV3D (void)
+CV3D::CV3D (CInterruptSystem *pInterruptSystem)
+: m_pInterruptSystem (pInterruptSystem)
 {
 }
 
@@ -285,7 +1236,7 @@ boolean CV3D::Init(void)
 	// read reg again
 	dump_v3d_regs();
 
-	pt_paddr = CMemorySystem::Get()->HeapAllocate(1024 * 4096, HEAP_DMA30);
+	pt_paddr = (u32 *)CMemorySystem::Get()->HeapAllocate(1024 * 4096, HEAP_DMA30);
 	mmu_scratch_paddr = CMemorySystem::Get()->HeapAllocate(4096, HEAP_DMA30);
 	if (pt_paddr && mmu_scratch_paddr)
 		printk("pgtable %08x mmu_scratch_paddr %08x", (u64)pt_paddr,
@@ -294,7 +1245,7 @@ boolean CV3D::Init(void)
 		printk("bug? failed to alloc");
 
 	// cf: v3d_mmu_set_page_table()
-	V3D_WRITE(V3D_MMU_PT_PA_BASE, (u64)(this->pt_paddr) >> V3D_MMU_PAGE_SHIFT);
+	V3D_WRITE(V3D_MMU_PT_PA_BASE, (u64)(pt_paddr) >> V3D_MMU_PAGE_SHIFT);
 	V3D_WRITE(V3D_MMU_CTL,
 		  V3D_MMU_CTL_ENABLE |
 		  V3D_MMU_CTL_PT_INVALID_ENABLE |
@@ -304,12 +1255,14 @@ boolean CV3D::Init(void)
 		  V3D_MMU_CTL_WRITE_VIOLATION_INT |
 		  V3D_MMU_CTL_CAP_EXCEEDED_ABORT |
 		  V3D_MMU_CTL_CAP_EXCEEDED_INT);
-	V3D_WRITE(V3D_MMU_ILLEGAL_ADDR,
-		  (u64)(this->mmu_scratch_paddr) >> V3D_MMU_PAGE_SHIFT |
+			V3D_WRITE(V3D_MMU_ILLEGAL_ADDR,
+		  (u64)(mmu_scratch_paddr) >> V3D_MMU_PAGE_SHIFT |
 		  V3D_MMU_ILLEGAL_ADDR_ENABLE);
 	V3D_WRITE(V3D_MMUC_CONTROL, V3D_MMUC_CONTROL_ENABLE);
 
 	v3d_mmu_flush_all();
+
+	m_pInterruptSystem->ConnectIRQ(ARM_IRQ_V3D, v3d_irq, 0);
 
 	return true;
 }
@@ -396,4 +1349,16 @@ void CV3D::power_on(bool on)
 		asb_power_on();
 	else
 		asb_power_off();
+}
+
+extern "C"{
+	extern struct record_entry * v3d_records_loadmem;
+}
+
+int CV3D::Replay(void)
+{
+	v3d_replay(v3d_records_loadmem, "");
+	v3d_replay_cleanup();
+
+	return 0;
 }
