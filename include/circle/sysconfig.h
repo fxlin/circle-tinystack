@@ -81,6 +81,7 @@
 
 #ifndef HEAP_BLOCK_BUCKET_SIZES
 #define HEAP_BLOCK_BUCKET_SIZES	0x40,0x400,0x1000,0x4000,0x10000,0x40000,0x80000
+//#define HEAP_BLOCK_BUCKET_SIZES	0x1000,0x4000,0x10000,0x40000,0x80000 // xzl
 #endif
 
 ///////////////////////////////////////////////////////////////////////

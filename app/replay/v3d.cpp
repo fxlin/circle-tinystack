@@ -353,7 +353,9 @@ static int elf_read(FIL *fp, void *buf, u32 len, u32 pos)
 static int elf_read_img(const char *elfbase, ssize_t elfsize,
 		void *buf, u32 len, u32 pos)
 {
-	BUG_ON(!elfbase || !buf || pos + len >= elfsize);
+	printk("buf %lx len %d pos %u", (u64)buf, len, pos);
+
+	BUG_ON(!elfbase || !buf || pos + len > elfsize);
 	memcpy(buf, elfbase + pos, len);
 	return 0;
 }
@@ -666,6 +668,8 @@ static int v3d_replay(const struct record_entry *records,
 	ts_start = ktime_get_ns();
 
 	for (;;) {
+		printk("to exec: rec %u one record addr is %16lx", counter+1, (u64)records);
+
 		switch (records->type) {
 		case type_access_reg:
 		{
@@ -701,11 +705,13 @@ static int v3d_replay(const struct record_entry *records,
 				}
 			} else if (!strncmp(records->entry_access_reg.group, "core", 4)) {
 				BUG_ON(records->entry_access_reg.core != 0); // we only support core==0
-				if (rw == 'w')
+				if (rw == 'w') {
+					// XXX won't have irq without this. is it because we write reg too fast???
+					printk("going to write core reg...");
 					V3D_CORE_WRITE_NOTRACE(records->entry_access_reg.core,
 							records->entry_access_reg.offset,
 							records->entry_access_reg.val);
-				else {
+				} else {
 					u32 val = V3D_CORE_READ_NOTRACE(records->entry_access_reg.core,
 							records->entry_access_reg.offset);
 					if (val != records->entry_access_reg.val) {
@@ -757,6 +763,7 @@ static int v3d_replay(const struct record_entry *records,
 				ret = (wait_for((atomic_read(&v3d_replay_irqcnt) == expected),
 						WAIT_FOR_IRQ_TIMEOUT_US/1000 /*ms*/));
 #else
+				printk("spin waiting...");
 				{ // udelay, spin waiting
 					int k, cur;
 					int iter = WAIT_FOR_IRQ_TIMEOUT_US / 20;
@@ -779,7 +786,10 @@ static int v3d_replay(const struct record_entry *records,
 				total_irq_ns += (t1-t0);
 
 				if (ret)
-					printk("bug? wait for irq %s timeout (around %lld ms)", src, ms);
+					printk("bug? wait for irq %s timeout (around %lld ms)",
+							src, ms);
+//					printk("bug? wait for irq %s timeout (around %lld ms) V3D_CTL_INT_STS %08x",
+//							src, ms, V3D_CORE_READ(0, V3D_CTL_INT_STS));
 				else
 					printk("wait for irq %s okay. (around %lld ms)", src, ms);
 			}	// else no delay
@@ -859,6 +869,7 @@ static int v3d_replay(const struct record_entry *records,
 
 				u32 phys;
 				void *p = CMemorySystem::HeapAllocate(num_pages * 4096, HEAP_DMA30);
+				printk("p is %lx", (u64)p);
 				BUG_ON(!p || ((u64)p & (PAGE_SIZE - 1))); // must be page aligned
 
 				phys = (u32)(u64)p;
@@ -981,21 +992,32 @@ static int v3d_replay(const struct record_entry *records,
 			ssize_t elfsize;
 
 			extern const char _binary_mem_csd_0001_elf_start;
+			extern const char _binary_mem_csd_0001_elf_end;
 			extern unsigned long _binary_mem_csd_0001_elf_size;
+			elfbuf = &_binary_mem_csd_0001_elf_start;
+			elfsize = &_binary_mem_csd_0001_elf_end - &_binary_mem_csd_0001_elf_start;
 
-			elfsize = _binary_mem_csd_0001_elf_size;
+//			const char _binary_mem_csd_0001_elf_start = 0;
+//			unsigned long _binary_mem_csd_0001_elf_size = 0;
+
+//			extern const char _binary_dummy_bin_start;
+//			extern const char _binary_dummy_bin_end;
+//			extern int _binary_dummy_bin_size;
+//			elfbuf = &_binary_dummy_bin_start;
+//			elfsize = &_binary_dummy_bin_end - &_binary_dummy_bin_start;
 
 			t0 = ktime_get_ns();
 
 			if (!strcmp(records->entry_write_gpu_mem_fromfile.tag, "csd_0001")) {
-				elfbuf = &_binary_mem_csd_0001_elf_start;
-				printk("open elf img, size %08lx...", _binary_mem_csd_0001_elf_size);
+//				elfbuf = &_binary_mem_csd_0001_elf_start;
+				printk("open elf img, base %0lx size %d...",
+						elfbuf, elfsize);
 
 				int res = xzl_load_gpu_regions_elfimg(elfbuf, elfsize);
 
 				BUG_ON(res != 0);
 				t1 = ktime_get_ns();
-				printk("loaded mem dump. %zd KB in %lld ms",
+				printk("loaded mem dump. %lu KB in %lld ms",
 						elfsize/1000, (t1-t0)/1000/1000);
 				total_load_ns += (t1-t0);
 			} else
@@ -1016,7 +1038,7 @@ static int v3d_replay(const struct record_entry *records,
 			goto done;
 		default:
 			ret = -10;
-			printk("unrecognized type, abort");
+			printk("unrecognized type %d, abort", records->type);
 			goto done;
 			break;
 		} // switch
@@ -1053,6 +1075,8 @@ v3d_hub_irq(void *arg)
 	irqreturn_t status = IRQ_NONE;
 
 	intsts = V3D_READ(V3D_HUB_INT_STS);
+
+	printk("xzl: a hub irq 0x%x", intsts);
 
 	/* Acknowledge the interrupts we're handling here. */
 	V3D_WRITE(V3D_HUB_INT_CLR, intsts);
@@ -1116,10 +1140,12 @@ v3d_hub_irq(void *arg)
 void v3d_irq(void *arg)
 {
 	u32 intsts;
-	int status = -1;
+	int status = IRQ_NONE;
 //	int irq = ARM_IRQ_V3D;
 
 	intsts = V3D_CORE_READ(0, V3D_CTL_INT_STS);
+
+	printk("xzl: that's an irq. V3D_CTL_INT_STS %08x", intsts);
 
 	/* Acknowledge the interrupts we're handling here. */
 	V3D_CORE_WRITE(0, V3D_CTL_INT_CLR, intsts);
@@ -1162,7 +1188,7 @@ void v3d_irq(void *arg)
 			status = v3d_hub_irq(arg);
 
 		// too many msgs
-	//	DRM_INFO("xzl: that's all about irq. signal fence");
+//		printk("xzl: that's all about irq. signal fence");
 
 		atomic_inc(&v3d_replay_irqcnt);
 		DataMemBarrier();
@@ -1238,11 +1264,21 @@ boolean CV3D::Init(void)
 
 	pt_paddr = (u32 *)CMemorySystem::Get()->HeapAllocate(1024 * 4096, HEAP_DMA30);
 	mmu_scratch_paddr = CMemorySystem::Get()->HeapAllocate(4096, HEAP_DMA30);
+
+
 	if (pt_paddr && mmu_scratch_paddr)
 		printk("pgtable %08x mmu_scratch_paddr %08x", (u64)pt_paddr,
 				(u64)mmu_scratch_paddr);
 	else
 		printk("bug? failed to alloc");
+
+//	printk("pgtable %08x mmu_scratch_paddr %08x", (u64)pt_paddr & (PAGE_SIZE-1),
+//			(u64)mmu_scratch_paddr & (PAGE_SIZE-1));
+
+	assert(pt_paddr && mmu_scratch_paddr
+			&& (((u64)pt_paddr & (PAGE_SIZE-1)) == 0)
+			&& (((u64)mmu_scratch_paddr & (PAGE_SIZE-1)) == 0)
+			);
 
 	// cf: v3d_mmu_set_page_table()
 	V3D_WRITE(V3D_MMU_PT_PA_BASE, (u64)(pt_paddr) >> V3D_MMU_PAGE_SHIFT);
@@ -1262,6 +1298,9 @@ boolean CV3D::Init(void)
 
 	v3d_mmu_flush_all();
 
+	printk("----- connect irq ----- ");
+	assert(m_pInterruptSystem);
+//	m_pInterruptSystem->DisconnectIRQ(ARM_IRQ_V3D); // why it was connected already??
 	m_pInterruptSystem->ConnectIRQ(ARM_IRQ_V3D, v3d_irq, 0);
 
 	return true;
@@ -1352,12 +1391,15 @@ void CV3D::power_on(bool on)
 }
 
 extern "C"{
-	extern struct record_entry * v3d_records_loadmem;
+	extern struct record_entry v3d_records_loadmem[]; // v3d_replay_linux.c
+	extern struct record_entry v3d_records_py[];
 }
 
 int CV3D::Replay(void)
 {
-	v3d_replay(v3d_records_loadmem, "");
+//	printk("CV3D::Replay addr is %16lx", (u64)&v3d_records_loadmem);
+//	v3d_replay(&v3d_records_loadmem[0], "");
+	v3d_replay(&v3d_records_py[0], "");
 	v3d_replay_cleanup();
 
 	return 0;

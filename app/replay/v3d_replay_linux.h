@@ -135,20 +135,4 @@ struct xzl_gpu_region {
 	u32 num_bytes;
 };
 
-void xzl_dump_all_gpu_regions(struct v3d_dev *v3d, char * tag);
-
-/* dump a given range of a GPU mem. Not whole BO
- * num_bytes == 0 --> dump until the end of this BO */
-void xzl_dump_gpu_mempart(struct v3d_dev *v3d, char* tag,
-		u32 start_addr, u32 num_bytes);
-
-/* given a list of regions, dump all the bos that contain the regions
- * dump whole BOs */
-void xzl_dump_gpu_regions(struct v3d_dev *v3d, char* tag,
-		struct xzl_gpu_region * regions);
-
-
-void xzl_dump_gpu_regions_elf(struct v3d_dev *v3d, char* tag,
-		struct xzl_gpu_region * r);
-
 #endif // V3D_REPLAY_H

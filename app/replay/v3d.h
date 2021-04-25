@@ -98,7 +98,7 @@ private:
 	void clock_on(bool enable =  true);
 //	CLogger			m_Logger;
 
-	CInterruptSystem *m_pInterruptSystem;
+	CInterruptSystem *m_pInterruptSystem = 0;
 };
 
 

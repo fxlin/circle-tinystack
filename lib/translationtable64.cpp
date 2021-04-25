@@ -17,7 +17,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-// xzl: does this create mapping?
+
+// xzl: seems to create identity mapping? and it takes cares of iomem vs dram
+
 #include <circle/translationtable64.h>
 #include <circle/synchronize.h>
 #include <circle/sysconfig.h>
@@ -40,6 +42,7 @@
 #define LEVEL2_TABLE_ENTRIES	128
 #endif
 
+// xzl: nMemSize: actual DRAM size?
 CTranslationTable::CTranslationTable (size_t nMemSize)
 :	m_nMemSize (nMemSize),
 	m_pTable (0)
@@ -93,6 +96,7 @@ uintptr CTranslationTable::GetBaseAddress (void) const
 	return (uintptr) m_pTable;
 }
 
+// xzl: @nBaseAddress --> the vaddr to map?
 TARMV8MMU_LEVEL3_DESCRIPTOR *CTranslationTable::CreateLevel3Table (uintptr nBaseAddress)
 {
 	TARMV8MMU_LEVEL3_DESCRIPTOR *pTable = (TARMV8MMU_LEVEL3_DESCRIPTOR *) palloc ();
@@ -129,13 +133,13 @@ TARMV8MMU_LEVEL3_DESCRIPTOR *CTranslationTable::CreateLevel3Table (uintptr nBase
 #else
 			if (nBaseAddress >= m_nMemSize)
 #endif
-			{
+			{ // xzl: io mem region (?)
 				pDesc->AttrIndx = ATTRINDX_DEVICE;
 				pDesc->SH	= ATTRIB_SH_OUTER_SHAREABLE;
 			}
 			else if (   nBaseAddress >= MEM_COHERENT_REGION
 				 && nBaseAddress <  MEM_HEAP_START)
-			{
+			{ // xzl: dram region (?)
 				pDesc->AttrIndx = ATTRINDX_COHERENT;
 				pDesc->SH	= ATTRIB_SH_OUTER_SHAREABLE;
 			}

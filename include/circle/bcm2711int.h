@@ -57,6 +57,9 @@
 #define ARM_IRQ_BCM54213_1	GIC_SPI (158)
 #define ARM_IRQ_XHCI_INTERNAL	GIC_SPI (176)
 
+// xzl: is the irq num correct? per /proc/interrupts
+#define ARM_IRQ_V3D 106
+
 #define IRQ_LINES		256
 
 // FIQs

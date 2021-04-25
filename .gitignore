@@ -98,4 +98,5 @@ tmp/
 .cproject
 .project
 .settings/
+.bin
 

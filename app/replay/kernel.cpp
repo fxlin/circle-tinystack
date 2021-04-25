@@ -15,6 +15,7 @@ static const char FromKernel[] = "kernel";
 CKernel::CKernel (void)
 :	m_Screen (m_Options.GetWidth (), m_Options.GetHeight ()),
 	m_Timer (&m_Interrupt),
+	m_v3d(&m_Interrupt),
 	m_Logger (m_Options.GetLogLevel (), &m_Timer)
 #ifdef V3D_LOAD_FROM_FILE
 	,m_USBHCI (&m_Interrupt, &m_Timer)
@@ -105,9 +106,12 @@ TShutdownMode CKernel::Run (void)
 	// test memory
 	printk("memory size is %lld MB", m_Memory.GetMemSize()/1024/1024);
 
+	m_v3d.Replay();
+
 	int secs = 10;
 	printk("to reboot in %d secs...", secs);
 	m_Timer.MsDelay(secs * 1000);
+
 
 	return ShutdownReboot;	// will cause reboot
 
