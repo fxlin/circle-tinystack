@@ -192,7 +192,7 @@ int CUSBHIDDevice::ReceiveFromEndpointIn (void *pBuffer, unsigned nBufSize, unsi
 	assert (nBufSize > 0);
 	return GetHost ()->Transfer (m_pReportEndpoint, pBuffer, nBufSize, nTimeoutMs);
 }
-
+// xzl: start once, then the host will poll automatically??
 boolean CUSBHIDDevice::StartRequest (void)
 {
 	assert (m_pReportEndpoint != 0);
@@ -239,7 +239,7 @@ void CUSBHIDDevice::CompletionRoutine (CUSBRequest *pURB)
 		CLogger::Get ()->Write (FromUSBHID, LogError, "Cannot restart request");
 	}
 }
-
+// xzl: callback from irq?
 void CUSBHIDDevice::CompletionStub (CUSBRequest *pURB, void *pParam, void *pContext)
 {
 	CUSBHIDDevice *pThis = (CUSBHIDDevice *) pContext;

@@ -32,6 +32,7 @@
 #include <circle/koptions.h>
 #include <circle/sysconfig.h>
 #include <circle/debug.h>
+#include <circle/tracer.h>	// xzl
 #include <assert.h>
 
 //
@@ -58,7 +59,7 @@ enum TStageSubState
 	StageSubStateUnknown
 };
 
-static const char FromDWHCI[] = "dwhci";
+static const char FromDWHCI[] = "dwhci"; // xzl: designware host controller
 
 CDWHCIDevice::CDWHCIDevice (CInterruptSystem *pInterruptSystem, CTimer *pTimer, boolean bPlugAndPlay)
 :	CUSBHostController (bPlugAndPlay),
@@ -207,7 +208,8 @@ void CDWHCIDevice::ReScanDevices (void)
 
 	PeripheralExit ();
 }
-
+// xzl: blocking == sync
+// can see each xfer has up to 3 stages.
 boolean CDWHCIDevice::SubmitBlockingRequest (CUSBRequest *pURB, unsigned nTimeoutMs)
 {
 	if (m_bShutdown)
@@ -221,14 +223,14 @@ boolean CDWHCIDevice::SubmitBlockingRequest (CUSBRequest *pURB, unsigned nTimeou
 
 	pURB->SetStatus (0);
 	
-	if (pURB->GetEndpoint ()->GetType () == EndpointTypeControl)
+	if (pURB->GetEndpoint ()->GetType () == EndpointTypeControl) // xzl:a control xfer
 	{
 		assert (nTimeoutMs == USB_TIMEOUT_NONE);
 
 		TSetupData *pSetup = pURB->GetSetupData ();
 		assert (pSetup != 0);
 
-		if (pSetup->bmRequestType & REQUEST_IN)
+		if (pSetup->bmRequestType & REQUEST_IN) // xzl: data to host
 		{
 			assert (pURB->GetBufLen () > 0);
 			
@@ -260,7 +262,7 @@ boolean CDWHCIDevice::SubmitBlockingRequest (CUSBRequest *pURB, unsigned nTimeou
 			}
 		}
 	}
-	else
+	else // xzl: otherwise (bulk, interrupt) no iso
 	{
 		assert (   pURB->GetEndpoint ()->GetType () == EndpointTypeBulk
 		        || pURB->GetEndpoint ()->GetType () == EndpointTypeInterrupt);
@@ -677,7 +679,9 @@ void CDWHCIDevice::FlushRxFIFO (void)
 	
 	m_pTimer->usDelay (1);		// Wait for 3 PHY clocks
 }
-
+// xzl:  seems a core func. wrapper around TransferStageAsync()
+// xzl: bIn: is it input? bStatus; is it status?
+// xfer stage -- part of a transaction?
 boolean CDWHCIDevice::TransferStage (CUSBRequest *pURB, boolean bIn, boolean bStatusStage,
 				     unsigned nTimeoutMs)
 {
@@ -710,7 +714,7 @@ boolean CDWHCIDevice::TransferStage (CUSBRequest *pURB, boolean bIn, boolean bSt
 
 	return pURB->GetStatus ();
 }
-
+// xzl: callback of stage (??)
 void CDWHCIDevice::CompletionRoutine (CUSBRequest *pURB, void *pParam, void *pContext)
 {
 	CDWHCIDevice *pThis = (CDWHCIDevice *) pContext;
@@ -721,7 +725,8 @@ void CDWHCIDevice::CompletionRoutine (CUSBRequest *pURB, void *pParam, void *pCo
 
 	pThis->m_bWaiting[nWaitBlock] = FALSE;
 }
-
+// xzl: a stage of a xfer. can have multiple tx. can be a setup/data/status stage.
+// grab a new channel for it
 boolean CDWHCIDevice::TransferStageAsync (CUSBRequest *pURB, boolean bIn, boolean bStatusStage,
 					  unsigned nTimeoutMs)
 {
@@ -776,9 +781,9 @@ boolean CDWHCIDevice::TransferStageAsync (CUSBRequest *pURB, boolean bIn, boolea
 	}
 
 #ifndef USE_USB_SOF_INTR
-	StartTransaction (pStageData);
+	StartTransaction (pStageData); // xzl: kickoff the 1st tx for the stage
 #else
-	QueueTransaction (pStageData);
+	QueueTransaction (pStageData); // xzl: if SOF, queue transaction until upcoming SOF?
 #endif
 	
 	return TRUE;
@@ -855,10 +860,11 @@ void CDWHCIDevice::StartTransaction (CDWHCITransferStageData *pStageData)
 	assert (nChannel < m_nChannels);
 	
 	// channel must be disabled, if not already done but controller
+	// xzl: the channel is allocated for / used throughout the entire stage.
 	CDWHCIRegister Character (DWHCI_HOST_CHAN_CHARACTER (nChannel));
 	Character.Read ();
 	if (Character.IsSet (DWHCI_HOST_CHAN_CHARACTER_ENABLE))
-	{
+	{ // xzl: if enabled, force the channel off - which will be notified by irq (?)
 		pStageData->SetSubState (StageSubStateWaitForChannelDisable);
 		
 		Character.And (~DWHCI_HOST_CHAN_CHARACTER_ENABLE);
@@ -874,7 +880,10 @@ void CDWHCIDevice::StartTransaction (CDWHCITransferStageData *pStageData)
 		StartChannel (pStageData);
 	}
 }
-
+// xzl: start tx on a channel. the chan is already ready. may have been used for
+// 		earlier stages of this stage/xfer
+// called for a transaction.
+// @pStageData - the context for the stage
 void CDWHCIDevice::StartChannel (CDWHCITransferStageData *pStageData)
 {
 	assert (pStageData != 0);
@@ -889,6 +898,8 @@ void CDWHCIDevice::StartChannel (CDWHCITransferStageData *pStageData)
 	ChanInterrupt.Write ();
 	
 	// set transfer size, packet count and pid
+	// xzl: the "transfer" seems for this tx. e.g. xfer size is per tx.
+	// 			it's not a USB transfer (multi stages...)
 	CDWHCIRegister TransferSize (DWHCI_HOST_CHAN_XFER_SIZ (nChannel), 0);
 	TransferSize.Or (pStageData->GetBytesToTransfer () & DWHCI_HOST_CHAN_XFER_SIZ_BYTES__MASK);
 	TransferSize.Or ((pStageData->GetPacketsToTransfer () << DWHCI_HOST_CHAN_XFER_SIZ_PACKETS__SHIFT)
@@ -903,7 +914,7 @@ void CDWHCIDevice::StartChannel (CDWHCITransferStageData *pStageData)
 
 	CleanAndInvalidateDataCacheRange (pStageData->GetDMAAddress (), pStageData->GetBytesToTransfer ());
 
-	// set split control
+	// set split control (xzl: keep split tx going or finish one)
 	CDWHCIRegister SplitControl (DWHCI_HOST_CHAN_SPLIT_CTRL (nChannel), 0);
 	if (pStageData->IsSplit ())
 	{
@@ -983,7 +994,7 @@ void CDWHCIDevice::StartChannel (CDWHCITransferStageData *pStageData)
 	Character.And (~DWHCI_HOST_CHAN_CHARACTER_DISABLE);
 	Character.Write ();
 }
-
+// xzl: a channel is bound to a stage which has its FSM to drive
 void CDWHCIDevice::ChannelInterruptHandler (unsigned nChannel)
 {
 	if (m_bShutdown)
@@ -1013,9 +1024,10 @@ void CDWHCIDevice::ChannelInterruptHandler (unsigned nChannel)
 		return;
 	}
 
+	// xzl: drive "substate" FSM. prior to a tx? in case that we haven't get hold of this chan?
 	switch (pStageData->GetSubState ())
 	{
-	case StageSubStateWaitForChannelDisable:
+	case StageSubStateWaitForChannelDisable:// xzl: was waiting for the chan. now chan is ready
 		StartChannel (pStageData);
 		return;
 
@@ -1034,7 +1046,7 @@ void CDWHCIDevice::ChannelInterruptHandler (unsigned nChannel)
 			StartTransaction (pStageData);
 #else
 			m_pStageData[nChannel] = 0;
-			FreeChannel (nChannel);
+			FreeChannel (nChannel); // xzl: use the channel once and then done?
 
 			QueueTransaction (pStageData);
 #endif
@@ -1056,7 +1068,7 @@ void CDWHCIDevice::ChannelInterruptHandler (unsigned nChannel)
 	}
 
 	unsigned nStatus;
-	
+	// xzl: drive FSM of this stage
 	switch (pStageData->GetState ())
 	{
 	case StageStateNoSplitTransfer:
@@ -1288,7 +1300,7 @@ void CDWHCIDevice::ChannelInterruptHandler (unsigned nChannel)
 }
 
 #ifdef USE_USB_SOF_INTR
-
+// xzl: fire every 1ms???
 void CDWHCIDevice::SOFInterruptHandler (void)
 {
 	if (m_bShutdown)
@@ -1296,12 +1308,16 @@ void CDWHCIDevice::SOFInterruptHandler (void)
 		return;
 	}
 
+	CTracer::Get()->Event(TRACE_SOFIRQ_START);
+
 	CDWHCIRegister FrameNumber (DWHCI_HOST_FRM_NUM);
 	u16 usFrameNumber = DWHCI_HOST_FRM_NUM_NUMBER (FrameNumber.Read ());
 
+	// xzl: tries to issue prev enqueued tx for this frame?
 	CDWHCITransferStageData *pStageData;
 	while ((pStageData = m_TransactionQueue.Dequeue (usFrameNumber)) != 0)
 	{
+		// xzl: grab a channel and exec a tx
 		unsigned nChannel = AllocateChannel ();
 		if (nChannel >= m_nChannels)
 		{
@@ -1316,15 +1332,19 @@ void CDWHCIDevice::SOFInterruptHandler (void)
 
 		StartTransaction (pStageData);
 	}
+
+	CTracer::Get()->Event(TRACE_SOFIRQ_END);
 }
 
 #endif
-
+// xzl: dispatch irq to individual chans
 void CDWHCIDevice::InterruptHandler (void)
 {
 #ifndef NDEBUG
 	//debug_click ();
 #endif
+
+	CTracer::Get()->Event(TRACE_IRQ_START);
 
 	PeripheralEntry ();
 
@@ -1392,6 +1412,8 @@ void CDWHCIDevice::InterruptHandler (void)
 	IntStatus.Write ();
 
 	PeripheralExit ();
+
+	CTracer::Get()->Event(TRACE_IRQ_END);
 }
 
 void CDWHCIDevice::InterruptStub (void *pParam)

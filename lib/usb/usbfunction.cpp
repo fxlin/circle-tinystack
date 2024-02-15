@@ -25,7 +25,7 @@
 #include <assert.h>
 
 static const char FromUSBFunction[] = "usbfct";
-
+// xzl: parse the "current" interface (the parser is stateful) as a func
 CUSBFunction::CUSBFunction (CUSBDevice *pDevice, CUSBConfigurationParser *pConfigParser)
 :	m_pDevice (pDevice),
 	m_pConfigParser (0),
@@ -34,7 +34,7 @@ CUSBFunction::CUSBFunction (CUSBDevice *pDevice, CUSBConfigurationParser *pConfi
 	assert (m_pDevice != 0);
 
 	assert (pConfigParser != 0);
-	m_pConfigParser = new CUSBConfigurationParser (pConfigParser);
+	m_pConfigParser = new CUSBConfigurationParser (pConfigParser);// xzl: why this? seems deepcopy
 	assert (m_pConfigParser != 0);
 
 	m_pInterfaceDesc = (TUSBInterfaceDescriptor *) m_pConfigParser->GetCurrentDescriptor ();
@@ -72,7 +72,7 @@ boolean CUSBFunction::Initialize (void)
 {
 	return TRUE;
 }
-
+// xzl: set interface... to assign an interface number??
 boolean CUSBFunction::Configure (void)
 {
 	assert (m_pInterfaceDesc != 0);

@@ -305,6 +305,7 @@ boolean CUSBBulkOnlyMassStorageDevice::Configure (void)
 		return FALSE;
 	}
 
+	// xzl: test device ready??
 	unsigned nTries = 100;
 	while (--nTries)
 	{
@@ -422,6 +423,8 @@ int CUSBBulkOnlyMassStorageDevice::Read (void *pBuffer, size_t nCount)
 
 	int nResult;
 
+	CLogger::Get ()->Write (FromUmsd, LogDebug, "xzl: read once %u", nCount);
+
 	do
 	{
 		nResult = TryRead (pBuffer, nCount);
@@ -465,7 +468,7 @@ int CUSBBulkOnlyMassStorageDevice::Write (const void *pBuffer, size_t nCount)
 
 	return nResult;
 }
-
+// xzl: just internal bookkeeping
 u64 CUSBBulkOnlyMassStorageDevice::Seek (u64 ullOffset)
 {
 	m_ullOffset = ullOffset;
@@ -584,7 +587,7 @@ int CUSBBulkOnlyMassStorageDevice::Command (void *pCmdBlk, size_t nCmdBlkLen,
 
 	int nResult = 0;
 	
-	if (nBufLen > 0)
+	if (nBufLen > 0) // xzl: use a separate DMA buffer.
 	{
 		assert (pBuffer != 0);
 

@@ -76,8 +76,9 @@ struct TSetupData
 PACKED;
 
 // Request Types
-#define REQUEST_OUT			0
-#define REQUEST_IN			0x80
+// xzl: packet id?? cf: https://www.beyondlogic.org/usbnutshell/usb6.shtml
+#define REQUEST_OUT			0 //xzl: flags. data host to device
+#define REQUEST_IN			0x80 //xzl: device to host
 
 #define REQUEST_CLASS			0x20
 #define REQUEST_VENDOR			0x40

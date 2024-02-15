@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
+// xzl: FSM for an endpoint.
 #ifndef _circle_usb_usbendpoint_h
 #define _circle_usb_usbendpoint_h
 
@@ -53,7 +54,7 @@ public:
 	unsigned GetInterval (void) const;		// Milliseconds
 
 	TUSBPID GetNextPID (boolean bStatusStage);
-	void SkipPID (unsigned nPackets, boolean bStatusStage);
+	void SkipPID (unsigned nPackets, boolean bStatusStage); // xzl: for what?
 #endif
 	void ResetPID (void);
 

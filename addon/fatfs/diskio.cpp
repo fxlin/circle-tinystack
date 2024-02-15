@@ -7,7 +7,7 @@
 /* This is an example of glue functions to attach various exsisting      */
 /* storage control modules to the FatFs module with a defined API.       */
 /*-----------------------------------------------------------------------*/
-
+// xzl: seems a dummy block layer
 #include "ff.h"			/* Obtains integer types */
 #include "diskio.h"		/* Declarations of disk functions */
 #include <circle/device.h>

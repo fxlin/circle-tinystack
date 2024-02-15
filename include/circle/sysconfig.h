@@ -192,6 +192,10 @@
 // system timing, because it triggers up to 8000 IRQs per second. For
 // USB plug-and-play operation this option must be set in any case.
 // This option has no influence on the Raspberry Pi 4.
+// xzl: this seems to raise irq every time SOF is sent, so that queued tx can be
+// sent. why?
+
+#define NO_USB_SOF_INTR // xzl, avoid numerous irqs...
 
 #ifndef NO_USB_SOF_INTR
 #define USE_USB_SOF_INTR

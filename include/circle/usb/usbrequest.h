@@ -60,7 +60,7 @@ private:
 	CUSBEndpoint *m_pEndpoint;
 	
 	TSetupData *m_pSetupData;
-	void	   *m_pBuffer;
+	void	   *m_pBuffer; // xzl: may point to DMA buf
 	u32	    m_nBufLen;
 	
 	int	    m_bStatus;

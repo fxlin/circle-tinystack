@@ -52,11 +52,14 @@ PACKED;
 
 static const char FromKernel[] = "kernel";
 
+#define TRACE_DEPTH 1024 * 1024
+
 CKernel::CKernel (void)
 :	m_Screen (m_Options.GetWidth (), m_Options.GetHeight ()),
 	m_Timer (&m_Interrupt),
 	m_Logger (m_Options.GetLogLevel (), &m_Timer),
-	m_USBHCI (&m_Interrupt, &m_Timer)
+	m_USBHCI (&m_Interrupt, &m_Timer),
+	m_Tracer (TRACE_DEPTH, TRUE) // xzl
 {
 	m_ActLED.Blink (5);	// show we are alive
 }
@@ -100,10 +103,17 @@ boolean CKernel::Initialize (void)
 		bOK = m_Timer.Initialize ();
 	}
 
+	m_Tracer.Start(); // xzl
+
 	if (bOK)
 	{
 		bOK = m_USBHCI.Initialize ();
 	}
+
+//	m_Tracer.Stop(); // xzl
+//	m_Tracer.Dump(); // xzl
+	m_Logger.Write (FromKernel, LogNotice, "====> total reg access %u: ",
+			m_Tracer.Count());
 
 	return bOK;
 }
@@ -155,6 +165,10 @@ TShutdownMode CKernel::Run (void)
 				MBR.Partition[nPartition].LBAFirstSector,
 				MBR.Partition[nPartition].NumberOfSectors);
 	}
+
+	// xzl
+	m_Logger.Write (FromKernel, LogNotice, "====> total reg access %u: ",
+				m_Tracer.Count());
 
 	return ShutdownHalt;
 }

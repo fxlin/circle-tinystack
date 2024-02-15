@@ -87,7 +87,7 @@ boolean CNetDeviceLayer::Initialize (boolean bWaitForActivate)
 
 	return TRUE;
 }
-
+// xzl: polling?
 void CNetDeviceLayer::Process (void)
 {
 	if (m_pDevice == 0)

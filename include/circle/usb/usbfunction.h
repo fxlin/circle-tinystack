@@ -30,7 +30,7 @@
 class CUSBDevice;
 class CUSBHostController;
 class CUSBEndpoint;
-
+// xzl: "function" not a USB term. seems to wrap around an "interface"
 class CUSBFunction : public CDevice
 {
 public:

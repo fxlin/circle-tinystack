@@ -17,6 +17,10 @@
 #include <linux/slab.h> // kmalloc
 #include <linux/errno.h>
 
+extern "C" {
+	#include "../lib/zlib_inflate/zlib.h"
+}
+
 #include "elf.h"
 #include "v3d.h"
 #include "v3d_regs.h"
@@ -678,6 +682,10 @@ static int v3d_replay(const struct record_entry *records,
 			int expected;
 			u64 t0;
 
+			if (delay <= REPLAY_DELAY_IRQ_BCL /*-1*/) {
+				expected = atomic_read(&v3d_replay_irqcnt) + 1;
+			}
+
 			t0 = ktime_get_ns(); // can be costly?
 
 			if (!strncmp(records->entry_access_reg.group, "hub", 3)) {
@@ -755,7 +763,7 @@ static int v3d_replay(const struct record_entry *records,
 				u64 t0, t1, ms;
 				int ret;
 
-				expected = atomic_read(&v3d_replay_irqcnt) + 1;
+//				expected = atomic_read(&v3d_replay_irqcnt) + 1;
 
 				t0 = ktime_get_ns();
 				// uses usleep
@@ -1402,5 +1410,6 @@ int CV3D::Replay(void)
 	v3d_replay(&v3d_records_py[0], "");
 	v3d_replay_cleanup();
 
+	zlib_inflate_blob(NULL, 0, NULL, 0); // try to call it XXX
 	return 0;
 }

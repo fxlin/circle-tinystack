@@ -103,7 +103,7 @@ private:
 	u32		 m_nTransferSize;
 	unsigned	 m_nPackets;
 	u32		 m_nBytesPerTransaction;
-	unsigned	 m_nPacketsPerTransaction;
+	unsigned	 m_nPacketsPerTransaction; // xzl: why need to set this?
 	u32		 m_nTotalBytesTransfered;
 
 	unsigned	 m_nState;

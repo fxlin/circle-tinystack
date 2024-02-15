@@ -86,9 +86,10 @@ vchiq_static_assert(IS_POW2(VCHIQ_MAX_SERVICES));
 vchiq_static_assert(VCHIQ_VERSION >= VCHIQ_VERSION_MIN);
 
 /* Run time control of log level, based on KERN_XXX level. */
-int vchiq_core_log_level = VCHIQ_LOG_DEFAULT;
-int vchiq_core_msg_log_level = VCHIQ_LOG_DEFAULT;
-int vchiq_sync_log_level = VCHIQ_LOG_DEFAULT;
+// xzl: changed the elvel
+int vchiq_core_log_level = VCHIQ_LOG_INFO; // VCHIQ_LOG_DEFAULT;
+int vchiq_core_msg_log_level = VCHIQ_LOG_INFO; // VCHIQ_LOG_DEFAULT;
+int vchiq_sync_log_level = VCHIQ_LOG_INFO; // VCHIQ_LOG_DEFAULT;
 
 static atomic_t pause_bulks_count = ATOMIC_INIT(0);
 
@@ -423,7 +424,7 @@ remote_event_destroy(REMOTE_EVENT_T *event)
 {
 	(void)event;
 }
-
+// xzl: to be signaled by an irq?
 static inline int
 remote_event_wait(REMOTE_EVENT_T *event)
 {
@@ -521,6 +522,7 @@ get_connected_service(VCHIQ_STATE_T *state, unsigned int port)
 	return NULL;
 }
 
+// xzl: post a flag; request the slot handler thread to poll in the future?
 inline void
 request_poll(VCHIQ_STATE_T *state, VCHIQ_SERVICE_T *service, int poll_type)
 {
@@ -1151,6 +1153,7 @@ release_slot(VCHIQ_STATE_T *state, VCHIQ_SLOT_INFO_T *slot_info,
 
 		/* A write barrier is necessary, but remote_event_signal
 		** contains one. */
+		// xzl: also signal the gpu?
 		remote_event_signal(&state->remote->recycle);
 	}
 
@@ -1158,11 +1161,12 @@ release_slot(VCHIQ_STATE_T *state, VCHIQ_SLOT_INFO_T *slot_info,
 }
 
 /* Called by the slot handler - don't hold the bulk mutex */
+// xzl: notify local threads of any completed of bulk transfer (??)
 static VCHIQ_STATUS_T
 notify_bulks(VCHIQ_SERVICE_T *service, VCHIQ_BULK_QUEUE_T *queue,
 	int retry_poll)
 {
-	VCHIQ_STATUS_T status = VCHIQ_SUCCESS;
+	VCHIQ_STATUS_T status = VCHIQ_SUCCESS; // xzl: bulk tranfer successful?
 
 	vchiq_log_trace(vchiq_core_log_level,
 		"%d: nb:%d %cx - p=%x rn=%x r=%x",
@@ -1171,6 +1175,8 @@ notify_bulks(VCHIQ_SERVICE_T *service, VCHIQ_BULK_QUEUE_T *queue,
 		queue->process, queue->remote_notify, queue->remove);
 
 	if (service->state->is_master) {
+		// xzl: meaning CPU is serving? send back reply msgs to the remote
+		// (in addition to notifying threads below...)
 		while (queue->remote_notify != queue->process) {
 			VCHIQ_BULK_T *bulk =
 				&queue->bulks[BULK_INDEX(queue->remote_notify)];
@@ -1192,6 +1198,7 @@ notify_bulks(VCHIQ_SERVICE_T *service, VCHIQ_BULK_QUEUE_T *queue,
 		queue->remote_notify = queue->process;
 	}
 
+	// xzl: go through each bulk? & call back? notify completion of bulks...
 	if (status == VCHIQ_SUCCESS) {
 		while (queue->remove != queue->remote_notify) {
 			VCHIQ_BULK_T *bulk =
@@ -1224,7 +1231,7 @@ notify_bulks(VCHIQ_SERVICE_T *service, VCHIQ_BULK_QUEUE_T *queue,
 					waiter = bulk->userdata;
 					if (waiter) {
 						waiter->actual = bulk->actual;
-						up(&waiter->event);
+						up(&waiter->event); // xzl: wake up caller thread?
 					}
 					spin_unlock(&bulk_waiter_spinlock);
 				} else if (bulk->mode ==
@@ -1253,7 +1260,7 @@ notify_bulks(VCHIQ_SERVICE_T *service, VCHIQ_BULK_QUEUE_T *queue,
 			status = VCHIQ_SUCCESS;
 	}
 
-	if (status == VCHIQ_RETRY)
+	if (status == VCHIQ_RETRY) // xzl: let the slot handler thread to do it?
 		request_poll(service->state, service,
 			(queue == &service->bulk_tx) ?
 			VCHIQ_POLL_TXNOTIFY : VCHIQ_POLL_RXNOTIFY);
@@ -1262,15 +1269,17 @@ notify_bulks(VCHIQ_SERVICE_T *service, VCHIQ_BULK_QUEUE_T *queue,
 }
 
 /* Called by the slot handler thread */
+// xzl: check & update the states of all (opened? active) services ...
 static void
 poll_services(VCHIQ_STATE_T *state)
 {
 	int group, i;
 
+	// xzl: 32 services per group??
 	for (group = 0; group < BITSET_SIZE(state->unused_service); group++) {
 		uint32_t flags;
 		flags = atomic_xchg(&state->poll_services[group], 0);
-		for (i = 0; flags; i++) {
+		for (i = 0; flags; i++) { // xzl: go through each service...
 			if (flags & (1 << i)) {
 				VCHIQ_SERVICE_T *service =
 					find_service_by_port(state,
@@ -1291,6 +1300,7 @@ poll_services(VCHIQ_STATE_T *state)
 					/* Make it look like a client, because
 					   it must be removed and not left in
 					   the LISTENING state. */
+					// xzl: meaning make the handler thread behave like an app thread?
 					service->public_fourcc =
 						VCHIQ_FOURCC_INVALID;
 
@@ -1311,6 +1321,7 @@ poll_services(VCHIQ_STATE_T *state)
 						request_poll(state, service,
 							VCHIQ_POLL_TERMINATE);
 				}
+				// xzl: check for any completed bulk transfers... and notify if needed
 				if (service_flags & (1 << VCHIQ_POLL_TXNOTIFY))
 					notify_bulks(service,
 						&service->bulk_tx,
@@ -1627,6 +1638,9 @@ parse_rx_slots(VCHIQ_STATE_T *state)
 
 	tx_pos = remote->tx_pos;
 
+	// xzl: NB @state is global (for the whole vchiq)
+	// apparently there's only one queue with one rx pos
+
 	while (state->rx_pos != tx_pos) {
 		VCHIQ_HEADER_T *header;
 		int msgid, size;
@@ -1641,8 +1655,9 @@ parse_rx_slots(VCHIQ_STATE_T *state)
 				SLOT_QUEUE_INDEX_FROM_POS(state->rx_pos) &
 				VCHIQ_SLOT_QUEUE_MASK];
 			state->rx_data = (char *)SLOT_DATA_FROM_INDEX(state,
-				rx_index);
+				rx_index); // xzl: aligned to the slot start?
 			state->rx_info = SLOT_INFO_FROM_INDEX(state, rx_index);
+			// xzl: local metadata for the slot?
 
 			/* Initialise use_count to one, and increment
 			** release_count at the end of the slot to avoid
@@ -2018,7 +2033,7 @@ skip_message:
 			service = NULL;
 		}
 
-		state->rx_pos += calc_stride(size);
+		state->rx_pos += calc_stride(size); // xzl: next msg?
 
 		DEBUG_TRACE(PARSE_LINE);
 		/* Perform some housekeeping when the end of the slot is
@@ -2051,6 +2066,8 @@ slot_handler_func(void *v)
 		rmb();
 
 		DEBUG_TRACE(SLOT_HANDLER_LINE);
+		// xzl: in what situation? check service state update?
+		//	posted by
 		if (state->poll_needed) {
 			/* Check if we need to suspend - may change our
 			 * conn_state */
@@ -2121,7 +2138,7 @@ slot_handler_func(void *v)
 		}
 
 		DEBUG_TRACE(SLOT_HANDLER_LINE);
-		parse_rx_slots(state);
+		parse_rx_slots(state); // xzl: to figure out incoming slots?
 	}
 	return 0;
 }
@@ -2291,6 +2308,7 @@ vchiq_init_slots(void *mem_base, int mem_size)
 		return NULL;
 	}
 
+	// xzl: this is the "super slot"
 	memset(slot_zero, 0, sizeof(VCHIQ_SLOT_ZERO_T));
 
 	slot_zero->magic = VCHIQ_MAGIC;
@@ -2301,6 +2319,7 @@ vchiq_init_slots(void *mem_base, int mem_size)
 	slot_zero->max_slots = VCHIQ_MAX_SLOTS;
 	slot_zero->max_slots_per_side = VCHIQ_MAX_SLOTS_PER_SIDE;
 
+	// xzl: split # of slots between master/slave??
 	slot_zero->master.slot_sync = first_data_slot;
 	slot_zero->master.slot_first = first_data_slot + 1;
 	slot_zero->master.slot_last = first_data_slot + (num_slots/2) - 1;
@@ -2456,6 +2475,7 @@ vchiq_init_state(VCHIQ_STATE_T *state, VCHIQ_SLOT_ZERO_T *slot_zero,
 		sema_init(&service_quota->quota_event, 0);
 	}
 
+	// xzl: init the local queue...
 	for (i = local->slot_first; i <= local->slot_last; i++) {
 		local->slot_queue[state->slot_queue_available++] = i;
 		up(&state->slot_available_event);
@@ -2561,6 +2581,7 @@ vchiq_init_state(VCHIQ_STATE_T *state, VCHIQ_SLOT_ZERO_T *slot_zero,
 	return status;
 }
 
+// xzl: for kernel bookkeeping only?
 /* Called from application thread when a client or server service is created. */
 VCHIQ_SERVICE_T *
 vchiq_add_service_internal(VCHIQ_STATE_T *state,
@@ -3654,6 +3675,7 @@ vchiq_set_service_option(VCHIQ_SERVICE_HANDLE_T handle,
 	return status;
 }
 
+// xzl: useful
 #ifndef __circle__
 void
 vchiq_dump_shared_state(void *dump_context, VCHIQ_STATE_T *state,

@@ -22,7 +22,8 @@
 
 #include <circle/sysconfig.h>
 #include <circle/types.h>
-
+// xzl: why need this? seems for split packet only. arrange multiple packets
+// in a frame?
 class CDWHCIFrameScheduler
 {
 public:

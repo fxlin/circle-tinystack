@@ -168,7 +168,7 @@ u32 CUSBEndpoint::GetMaxPacketSize (void) const
 }
 
 #if RASPPI <= 3
-
+// xzl: drive the FSM of a tx (multple packets).
 unsigned CUSBEndpoint::GetInterval (void) const
 {
 	assert (m_Type == EndpointTypeInterrupt);

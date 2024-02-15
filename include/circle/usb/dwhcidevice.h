@@ -137,7 +137,7 @@ private:
 
 	CSpinLock m_IntMaskSpinLock;
 
-	volatile boolean m_bWaiting[DWHCI_WAIT_BLOCKS];
+	volatile boolean m_bWaiting[DWHCI_WAIT_BLOCKS];// xzl:flags? one per channel?
 	volatile unsigned m_nWaitBlockAllocated;	// one bit per wait block, set if allocated
 	CSpinLock m_WaitBlockSpinLock;
 

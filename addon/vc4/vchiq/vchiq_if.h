@@ -46,7 +46,7 @@ extern "C" {
 
 #define VCHIQ_SERVICE_HANDLE_INVALID 0
 
-#define VCHIQ_SLOT_SIZE     4096
+#define VCHIQ_SLOT_SIZE     4096 // xzl: 4KB per slot?
 #define VCHIQ_MAX_MSG_SIZE  (VCHIQ_SLOT_SIZE - sizeof(VCHIQ_HEADER_T))
 #define VCHIQ_CHANNEL_SIZE  VCHIQ_MAX_MSG_SIZE /* For backwards compatibility */
 

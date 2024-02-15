@@ -98,7 +98,7 @@ vchiq_static_assert(IS_POW2(VCHIQ_MAX_SLOTS_PER_SIDE));
 #define VCHIQ_SLOT_MASK        (VCHIQ_SLOT_SIZE - 1)
 #define VCHIQ_SLOT_QUEUE_MASK  (VCHIQ_MAX_SLOTS_PER_SIDE - 1)
 #define VCHIQ_SLOT_ZERO_SLOTS  ((sizeof(VCHIQ_SLOT_ZERO_T) + \
-	VCHIQ_SLOT_SIZE - 1) / VCHIQ_SLOT_SIZE)
+	VCHIQ_SLOT_SIZE - 1) / VCHIQ_SLOT_SIZE) // xzl: # of "meta" blocks which can > 1?
 
 #define VCHIQ_MSG_PADDING            0  /* -                                 */
 #define VCHIQ_MSG_CONNECT            1  /* -                                 */
@@ -143,6 +143,7 @@ vchiq_static_assert((unsigned int)VCHIQ_PORT_MAX <
 #define VCHIQ_MSGID_PADDING            VCHIQ_MAKE_MSG(VCHIQ_MSG_PADDING, 0, 0)
 #define VCHIQ_MSGID_CLAIMED            0x40000000
 
+// xzl: what's fourcc?
 #define VCHIQ_FOURCC_INVALID           0x00000000
 #define VCHIQ_FOURCC_IS_LEGAL(fourcc)  (fourcc != VCHIQ_FOURCC_INVALID)
 
@@ -233,8 +234,8 @@ enum {
 };
 
 enum {
-	VCHIQ_POLL_TERMINATE,
-	VCHIQ_POLL_REMOVE,
+	VCHIQ_POLL_TERMINATE, // mutual exclusive from the below?
+	VCHIQ_POLL_REMOVE, // xzl: the service must be polled for removal??
 	VCHIQ_POLL_TXNOTIFY,
 	VCHIQ_POLL_RXNOTIFY,
 	VCHIQ_POLL_COUNT
@@ -257,7 +258,7 @@ typedef struct vchiq_bulk_struct {
 	void *remote_data;
 	int remote_size;
 	int actual;
-} VCHIQ_BULK_T;
+} VCHIQ_BULK_T; // xzl: what's this? bulk transfer?
 
 typedef struct vchiq_bulk_queue_struct {
 	int local_insert;  /* Where to insert the next local bulk */
@@ -267,7 +268,7 @@ typedef struct vchiq_bulk_queue_struct {
 	int remove;        /* Bulk to notify the local client of, and remove,
 			   ** next */
 	VCHIQ_BULK_T bulks[VCHIQ_NUM_SERVICE_BULKS];
-} VCHIQ_BULK_QUEUE_T;
+} VCHIQ_BULK_QUEUE_T; // xzl: for xfer bulks? not slots?
 
 typedef struct remote_event_struct {
 	int armed;
@@ -301,13 +302,13 @@ typedef struct vchiq_service_struct {
 	VCHIQ_USERDATA_TERM_T userdata_term;
 	unsigned int localport;
 	unsigned int remoteport;
-	int public_fourcc;
+	int public_fourcc; // xzl:??
 	int client_id;
 	char auto_close;
 	char sync;
 	char closing;
 	char trace;
-	atomic_t poll_flags;
+	atomic_t poll_flags; // xzl:actions of the service that need polling (?)
 	short version;
 	short version_min;
 	short peer_version;
@@ -390,11 +391,13 @@ typedef struct vchiq_shared_state_struct {
 
 	/* A circular buffer of slot indexes. */
 	int slot_queue[VCHIQ_MAX_SLOTS_PER_SIDE];
+	// xzl: the driver maintains a slot queue which contains indexes of slots?
 
 	/* Debugging state */
 	int debug[DEBUG_MAX];
 } VCHIQ_SHARED_STATE_T;
 
+// xzl: the "meta" slot?
 typedef struct vchiq_slot_zero_struct {
 	int magic;
 	short version;
@@ -404,8 +407,8 @@ typedef struct vchiq_slot_zero_struct {
 	int max_slots;
 	int max_slots_per_side;
 	int platform_data[2];
-	VCHIQ_SHARED_STATE_T master;
-	VCHIQ_SHARED_STATE_T slave;
+	VCHIQ_SHARED_STATE_T master; // xzl: gpu?
+	VCHIQ_SHARED_STATE_T slave; // xzl: cpu?
 	VCHIQ_SLOT_INFO_T slots[VCHIQ_MAX_SLOTS];
 } VCHIQ_SLOT_ZERO_T;
 
@@ -477,7 +480,7 @@ struct vchiq_state_struct {
 	int slot_queue_available;
 
 	/* A flag to indicate if any poll has been requested */
-	int poll_needed;
+	int poll_needed; // xzl: what does this mean?
 
 	/* Ths index of the previous slot used for data messages. */
 	int previous_data_index;

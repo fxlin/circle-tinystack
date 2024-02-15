@@ -21,6 +21,7 @@
 #define _circle_tracer_h
 
 #include <circle/types.h>
+#include <circle/string.h> // xzl
 
 struct TTraceEntry
 {
@@ -43,6 +44,8 @@ public:
 	void Event (unsigned nID, unsigned nParam1 = 0, unsigned nParam2 = 0, unsigned nParam3 = 0, unsigned nParam4 = 0);
 
 	void Dump (void);
+	unsigned Count(void); // xzl
+	CString DumpString (unsigned); // xzl
 
 	static CTracer *Get (void);
 
@@ -57,5 +60,18 @@ private:
 
 	static CTracer *s_pThis;
 };
+
+// xzl
+#define TRACE_REG_READ			1
+#define TRACE_REG_WRITE			2
+#define TRACE_IRQ_START			3
+#define TRACE_IRQ_END				4
+#define TRACE_SOFIRQ_START	5
+#define TRACE_SOFIRQ_END		6
+#define TRACE_WRITE_START		7
+#define TRACE_WRITE_END			8
+#define TRACE_READ_START		9
+#define TRACE_READ_END			10
+
 
 #endif

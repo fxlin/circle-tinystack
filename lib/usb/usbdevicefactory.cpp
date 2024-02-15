@@ -42,7 +42,8 @@
 #include <circle/usb/usbserialcp2102.h>
 #include <circle/usb/usbserialpl2303.h>
 #include <circle/usb/usbserialft231x.h>
-
+// xzl: build usb device "function" per name. (interface class/subclass/protocol
+// why return a "function" instead of a "device"??
 CUSBFunction *CUSBDeviceFactory::GetDevice (CUSBFunction *pParent, CString *pName)
 {
 	assert (pParent != 0);
@@ -50,6 +51,8 @@ CUSBFunction *CUSBDeviceFactory::GetDevice (CUSBFunction *pParent, CString *pNam
 
 	CUSBFunction *pResult = 0;
 
+	// xzl: 9-0-0 full speed hub, 9-0-1 highspeed hub single transaction translator
+	// 9-0-2 highspeed hub multi transaction translator
 	if (   pName->Compare ("int9-0-0") == 0
 	    || pName->Compare ("int9-0-2") == 0)
 	{

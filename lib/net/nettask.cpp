@@ -33,7 +33,7 @@ CNetTask::~CNetTask (void)
 
 void CNetTask::Run (void)
 {
-	while (1)
+	while (1) // xzl: looks polling?
 	{
 		assert (m_pNetSubSystem != 0);
 		m_pNetSubSystem->Process ();

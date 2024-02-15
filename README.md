@@ -1,24 +1,37 @@
-xzl:  workflow
+xzl:  
+
+Change options in Config.mk, which will override Rules.mk
+
+workflow for rpi4, 64bit
 
 load bootloader64 to uSD of rpi4
 
-on *dev* machine, go to the app's dir, change code -> make -> sudo make flash
-
+~~on *dev* machine, go to the app's dir, change code -> make -> sudo make flash~~
 developing w/ eclipse seems for Linux only (windows is more difficult)
 
 flash over serial seems enough
 
-add Config.mk; high baudrate is fine. 
+add/update Config.mk; high baudrate is fine. 
 
 go to boot/, 
 make firmware bootloader64
 
 this will build bootloader in tools/bootloader. 
 
-copy all to uSD. NB: the bootloader for rpi4 should be kernel8-rpi4.img
+copy all to uSD. 
+NB: the bootloader for rpi4 should be kernel8-rpi4.img
+    for rpi3 32bit it's kernel7.img
+    for rpi4 32bit it's kernel7l.img
+
+copy config64.txt as config.txt
+
+when bootloader starts, nothing will be on display (but the "rainbow" )
+
 
 to see debug msg, make sure change cmdline.txt
 logdev=tty1 loglevel=4
+tty1: screen. ttyS1: UART
+cf: doc/cmdline.txt
 
 these will be loaded as kernel options
 

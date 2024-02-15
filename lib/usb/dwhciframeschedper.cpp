@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
+// xzl: why need frame "scheduler?" is the scheduler in SW (not in host??)
 #include <circle/usb/dwhciframeschedper.h>
 #include <circle/usb/dwhciregister.h>
 #include <circle/usb/dwhci.h>

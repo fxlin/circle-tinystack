@@ -1,7 +1,7 @@
 /*-----------------------------------------------------------------------/
 /  Low level disk interface modlue include file   (C)ChaN, 2019          /
 /-----------------------------------------------------------------------*/
-
+// xzl: a dummy block layer
 #ifndef _DISKIO_DEFINED
 #define _DISKIO_DEFINED
 

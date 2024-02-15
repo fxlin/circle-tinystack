@@ -284,11 +284,14 @@ boolean CUSBStandardHub::EnumeratePorts (void)
 		CTimer::Get ()->MsDelay (nMsDelay);
 	}
 
+	CLogger::Get ()->Write (FromHub, LogDebug,
+							"xzl: going to init total %d ports", m_nPorts);
+
 	// now detect devices, reset and initialize them
 	for (unsigned nPort = 0; nPort < m_nPorts; nPort++)
 	{
 		if (m_pDevice[nPort] != 0)
-		{
+		{ // xzl: NB: if first time, we shouldn't have funcs here
 			m_pDevice[nPort]->ReScanDevices ();
 
 			continue;
@@ -299,7 +302,7 @@ boolean CUSBStandardHub::EnumeratePorts (void)
 			m_pStatus[nPort] = new TUSBPortStatus;
 			assert (m_pStatus[nPort] != 0);
 		}
-
+		// xzl: query a port by sending msgs to the hub device
 		if (pHost->ControlMessage (pEndpoint0,
 			REQUEST_IN | REQUEST_CLASS | REQUEST_TO_OTHER,
 			GET_STATUS, 0, nPort+1, m_pStatus[nPort], 4) != 4)
@@ -316,6 +319,7 @@ boolean CUSBStandardHub::EnumeratePorts (void)
 			continue;
 		}
 
+		// xzl: reset a port by sending msgs to the hub
 		if (pHost->ControlMessage (pEndpoint0,
 			REQUEST_OUT | REQUEST_CLASS | REQUEST_TO_OTHER,
 			SET_FEATURE, PORT_RESET, nPort+1, 0, 0) < 0)
@@ -327,6 +331,7 @@ boolean CUSBStandardHub::EnumeratePorts (void)
 
 		CTimer::Get ()->MsDelay (100);
 		
+		// xzl: get status again?
 		if (pHost->ControlMessage (pEndpoint0,
 			REQUEST_IN | REQUEST_CLASS | REQUEST_TO_OTHER,
 			GET_STATUS, 0, nPort+1, m_pStatus[nPort], 4) != 4)
@@ -371,6 +376,7 @@ boolean CUSBStandardHub::EnumeratePorts (void)
 			Speed = USBSpeedFull;
 		}
 
+		// xzl: register the new device ...
 		assert (m_pDevice[nPort] == 0);
 #if RASPPI <= 3
 		m_pDevice[nPort] = new CUSBDevice (pHost, Speed, this, nPort);
@@ -379,7 +385,7 @@ boolean CUSBStandardHub::EnumeratePorts (void)
 #endif
 		assert (m_pDevice[nPort] != 0);
 
-		if (!m_pDevice[nPort]->Initialize ())
+		if (!m_pDevice[nPort]->Initialize ()) // xzl: call init on the newly discovered device...
 		{
 			delete m_pDevice[nPort];
 			m_pDevice[nPort] = 0;
@@ -387,6 +393,9 @@ boolean CUSBStandardHub::EnumeratePorts (void)
 			continue;
 		}
 	}
+
+	CLogger::Get ()->Write (FromHub, LogDebug,
+									"xzl: going to config all devices of this hub...");
 
 	// now configure devices
 	for (unsigned nPort = 0; nPort < m_nPorts; nPort++)

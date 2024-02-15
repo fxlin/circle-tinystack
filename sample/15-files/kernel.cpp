@@ -19,17 +19,21 @@
 //
 #include "kernel.h"
 #include <circle/string.h>
+#include <circle/usb/usbmassdevice.h> // xzl
 
 #define PARTITION	"umsd1-1"
 #define FILENAME	"circle.txt"
 
 static const char FromKernel[] = "kernel";
 
+#define TRACE_DEPTH 1024 * 1024 // xzl
+
 CKernel::CKernel (void)
 :	m_Screen (m_Options.GetWidth (), m_Options.GetHeight ()),
 	m_Timer (&m_Interrupt),
 	m_Logger (m_Options.GetLogLevel (), &m_Timer),
-	m_USBHCI (&m_Interrupt, &m_Timer)
+	m_USBHCI (&m_Interrupt, &m_Timer),
+	m_Tracer (TRACE_DEPTH, TRUE) // xzl
 {
 	m_ActLED.Blink (5);	// show we are alive
 }
@@ -73,17 +77,92 @@ boolean CKernel::Initialize (void)
 		bOK = m_Timer.Initialize ();
 	}
 
+	m_Tracer.Start(); // xzl
+
 	if (bOK)
 	{
 		bOK = m_USBHCI.Initialize ();
 	}
 
+//	m_Tracer.Stop(); // xzl
+
 	return bOK;
 }
+
+struct TCHSAddress
+{
+	unsigned char Head;
+	unsigned char Sector	   : 6,
+		      CylinderHigh : 2;
+	unsigned char CylinderLow;
+}
+PACKED;
+
+struct TPartitionEntry
+{
+	unsigned char	Status;
+	TCHSAddress	FirstSector;
+	unsigned char	Type;
+	TCHSAddress	LastSector;
+	unsigned	LBAFirstSector;
+	unsigned	NumberOfSectors;
+}
+PACKED;
+
+struct TMasterBootRecord
+{
+	unsigned char	BootCode[0x1BE];
+	TPartitionEntry	Partition[4];
+	unsigned short	BootSignature;
+	#define BOOT_SIGNATURE		0xAA55
+}
+PACKED;
+
 
 TShutdownMode CKernel::Run (void)
 {
 	m_Logger.Write (FromKernel, LogNotice, "Compile time: " __DATE__ " " __TIME__);
+
+	CTracer::Get()->Event(TRACE_READ_START);
+	// load & parse MBR
+	{
+		CDevice *pUMSD1 = m_DeviceNameService.GetDevice ("umsd1", TRUE);
+		if (pUMSD1 == 0) {
+			m_Logger.Write (FromKernel, LogError, "USB mass storage device not found");
+			return ShutdownHalt;
+		}
+
+		u64 ullOffset = 0 * UMSD_BLOCK_SIZE;
+		if (pUMSD1->Seek (ullOffset) != ullOffset) {
+			m_Logger.Write (FromKernel, LogError, "Seek error");
+			return ShutdownHalt;
+		}
+
+		TMasterBootRecord MBR;
+		if (pUMSD1->Read (&MBR, sizeof MBR) != (int) sizeof MBR) {
+			m_Logger.Write (FromKernel, LogError, "Read error");
+			return ShutdownHalt;
+		}
+
+		if (MBR.BootSignature != BOOT_SIGNATURE) {
+			m_Logger.Write (FromKernel, LogError, "Boot signature not found");
+			return ShutdownHalt;
+		}
+
+		m_Logger.Write (FromKernel, LogNotice, "Dumping the partition table");
+		m_Logger.Write (FromKernel, LogNotice, "# Status Type  1stSector    Sectors");
+
+		for (unsigned nPartition = 0; nPartition < 4; nPartition++) {
+			m_Logger.Write (FromKernel, LogNotice, "%u %02X     %02X   %10u %10u",
+					nPartition+1,
+					(unsigned) MBR.Partition[nPartition].Status,
+					(unsigned) MBR.Partition[nPartition].Type,
+					MBR.Partition[nPartition].LBAFirstSector,
+					MBR.Partition[nPartition].NumberOfSectors);
+		}
+	}
+	CTracer::Get()->Event(TRACE_READ_END);
+	m_Tracer.Stop(); // xzl
 
 	// Mount file system
 	CDevice *pPartition = m_DeviceNameService.GetDevice (PARTITION, TRUE);
@@ -139,10 +218,26 @@ TShutdownMode CKernel::Run (void)
 		}
 	}
 
+	for (unsigned i = 0; i < m_Tracer.Count(); i++) {
+		CString Msg = m_Tracer.DumpString(i);
+		if (m_FileSystem.FileWrite (hFile,
+				(const char *) Msg, Msg.GetLength ()) != Msg.GetLength ()) {
+			m_Logger.Write (FromKernel, LogError, "Write error line %u", i);
+			break;
+		}
+	}
+
 	if (!m_FileSystem.FileClose (hFile))
 	{
 		m_Logger.Write (FromKernel, LogPanic, "Cannot close file");
-	}
+	} else
+		m_Logger.Write (FromKernel, LogDebug, "done.");
+
+	return ShutdownHalt;  // xzl
+
+
+
+
 
 	// Reopen file, read it and display its contents
 	hFile = m_FileSystem.FileOpen (FILENAME);

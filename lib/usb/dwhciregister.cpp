@@ -20,6 +20,7 @@
 #include <circle/usb/dwhciregister.h>
 #include <circle/memio.h>
 #include <circle/logger.h>
+#include <circle/tracer.h> // xzl
 #include <assert.h>
 
 CDWHCIRegister::CDWHCIRegister (u32 nAddress)
@@ -45,6 +46,11 @@ u32 CDWHCIRegister::Read (void)
 	m_nBuffer = read32 (m_nAddress);
 	m_bValid = TRUE;
 	
+//	CLogger::Get ()->Write ("\t xzl:", LogDebug,
+//							"dwhci READ offset 0x%X val 0x%X",
+//							m_nAddress & 0xFFF, m_nBuffer);
+
+	CTracer::Get()->Event(TRACE_REG_READ, m_nAddress, m_nBuffer);
 	return m_nBuffer;
 }
 
@@ -52,6 +58,11 @@ void CDWHCIRegister::Write (void)
 {
 	assert (m_bValid);
 	write32 (m_nAddress, m_nBuffer);
+
+//	CLogger::Get ()->Write ("\t xzl:", LogDebug,
+//						"dwhci WRITE offset 0x%X val 0x%X",
+//						m_nAddress & 0xFFF, m_nBuffer);
+	CTracer::Get()->Event(TRACE_REG_WRITE, m_nAddress, m_nBuffer);
 }
 
 u32 CDWHCIRegister::Get (void) const

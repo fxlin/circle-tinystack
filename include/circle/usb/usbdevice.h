@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
+// xzl: can have multiple functions (e.g. usb std hub)
 #ifndef _circle_usb_usbdevice_h
 #define _circle_usb_usbdevice_h
 

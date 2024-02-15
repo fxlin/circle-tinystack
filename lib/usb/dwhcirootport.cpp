@@ -50,7 +50,7 @@ boolean CDWHCIRootPort::Initialize (void)
 		return FALSE;
 	}
 	
-	// first create default device
+	// first create default device (xzl: hub?
 	assert (m_pDevice == 0);
 	m_pDevice = new CUSBDevice (m_pHost, Speed, this);
 	assert (m_pDevice != 0);
@@ -62,6 +62,8 @@ boolean CDWHCIRootPort::Initialize (void)
 
 		return FALSE;
 	}
+
+	CLogger::Get ()->Write (FromDWHCIRoot, LogDebug, "xzl: init done, going to config");
 
 	if (!m_pDevice->Configure ())
 	{

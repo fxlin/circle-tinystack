@@ -15,7 +15,7 @@
 #define DWHCI_DATA_FIFO_SIZE 		0x1000
 
 //
-// Core Registers
+// Core Registers  xzl: what's the diff core vs hub registers? core cfg, irq, state?
 //
 #define DWHCI_CORE_OTG_CTRL		(ARM_USB_CORE_BASE + 0x000)
 	#define DWHCI_CORE_OTG_CTRL_HST_SET_HNP_EN	(1 << 10)
@@ -114,7 +114,7 @@
 #define DWHCI_CORE_DEV_TX_FIFO(fifo)	(ARM_USB_CORE_BASE + 0x104 + (fifo)*4)	// dedicated FIFOs off
 
 //
-// Host Registers
+// Host Registers xzl: channel etc?
 //
 #define DWHCI_HOST_CFG			(ARM_USB_HOST_BASE + 0x000)
 	#define DWHCI_HOST_CFG_FSLS_PCLK_SEL__SHIFT	0
@@ -133,7 +133,7 @@
 #define DWHCI_HOST_ALLCHAN_INT_MASK	(ARM_USB_HOST_BASE + 0x018)
 #define DWHCI_HOST_FRMLST_BASE		(ARM_USB_HOST_BASE + 0x01C)
 // gap
-#define DWHCI_HOST_PORT 		(ARM_USB_HOST_BASE + 0x040)
+#define DWHCI_HOST_PORT 		(ARM_USB_HOST_BASE + 0x040) // xzl: 1 root port only?
 	#define DWHCI_HOST_PORT_CONNECT				(1 << 0)
 	#define DWHCI_HOST_PORT_CONNECT_CHANGED			(1 << 1)
 	#define DWHCI_HOST_PORT_ENABLE				(1 << 2)
@@ -151,7 +151,9 @@
 								 | DWHCI_HOST_PORT_ENABLE_CHANGED  \
 								 | DWHCI_HOST_PORT_OVERCURRENT_CHANGED)
 // gap
-// chan := 0..15 :
+// chan := 0..15 :  xzl: channel - seems a dwhci specific concept. allows CPU
+// to issue multiple tx (?) which are searilized (?) on wire
+// linux: HCCHAR
 #define DWHCI_HOST_CHAN_CHARACTER(chan)	(ARM_USB_HOST_BASE + 0x100 + (chan)*0x20)
 	#define DWHCI_HOST_CHAN_CHARACTER_MAX_PKT_SIZ__MASK	0x7FF
 	#define DWHCI_HOST_CHAN_CHARACTER_EP_NUMBER__SHIFT	11
@@ -199,19 +201,24 @@
 								 | DWHCI_HOST_CHAN_INT_FRAME_OVERRUN \
 								 | DWHCI_HOST_CHAN_INT_DATA_TOGGLE_ERROR)
 #define DWHCI_HOST_CHAN_INT_MASK(chan)	(ARM_USB_HOST_BASE + 0x10C + (chan)*0x20)
+// xzl: read back: bytes/packets are *left*,
+// cf: CDWHCITransferStageData::TransactionComplete
+// 		the semantics for readback PID?? the expected PID in the next xfer? and bit 31=?
+// a transfer has multiple txs. each tx has up to 3 packets.
+// xzl: HCTSIZ
 #define DWHCI_HOST_CHAN_XFER_SIZ(chan)	(ARM_USB_HOST_BASE + 0x110 + (chan)*0x20)
 	#define DWHCI_HOST_CHAN_XFER_SIZ_BYTES__MASK		0x7FFFF
-	#define DWHCI_HOST_CHAN_XFER_SIZ_PACKETS__SHIFT		19
+	#define DWHCI_HOST_CHAN_XFER_SIZ_PACKETS__SHIFT		19 //
 	#define DWHCI_HOST_CHAN_XFER_SIZ_PACKETS__MASK		(0x3FF << 19)
 	#define DWHCI_HOST_CHAN_XFER_SIZ_PACKETS(reg)		(((reg) >> 19) & 0x3FF)
-	#define DWHCI_HOST_CHAN_XFER_SIZ_PID__SHIFT		29
+	#define DWHCI_HOST_CHAN_XFER_SIZ_PID__SHIFT		29 // xzl: pid also packed in??
 	#define DWHCI_HOST_CHAN_XFER_SIZ_PID__MASK		(3 << 29)
-	#define DWHCI_HOST_CHAN_XFER_SIZ_PID(reg)		(((reg) >> 29) & 3)
+	#define DWHCI_HOST_CHAN_XFER_SIZ_PID(reg)		(((reg) >> 29) & 3) // xzl: what's semantics for readout?
 		#define DWHCI_HOST_CHAN_XFER_SIZ_PID_DATA0 	0
 		#define DWHCI_HOST_CHAN_XFER_SIZ_PID_DATA1 	2
 		#define DWHCI_HOST_CHAN_XFER_SIZ_PID_DATA2 	1
 		#define DWHCI_HOST_CHAN_XFER_SIZ_PID_MDATA 	3	// non-control transfer
-		#define DWHCI_HOST_CHAN_XFER_SIZ_PID_SETUP 	3
+		#define DWHCI_HOST_CHAN_XFER_SIZ_PID_SETUP 	3 // xzl: ??
 #define DWHCI_HOST_CHAN_DMA_ADDR(chan)	(ARM_USB_HOST_BASE + 0x114 + (chan)*0x20)
 // gap
 #define DWHCI_HOST_CHAN_DMA_BUF(chan)	(ARM_USB_HOST_BASE + 0x11C + (chan)*0x20)	// DDMA only

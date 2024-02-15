@@ -98,5 +98,7 @@ tmp/
 .cproject
 .project
 .settings/
-.bin
+*.bin
+
+.pydevproject*
 

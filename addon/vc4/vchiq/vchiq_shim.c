@@ -62,6 +62,7 @@ typedef struct {
 
 /* ----------------------------------------------------------------------
  * return pointer to the mphi message driver function table
+ * xzl: why NULL? to be patched?? just a place holder?
  * -------------------------------------------------------------------- */
 const VCHI_MESSAGE_DRIVER_T *
 vchi_mphi_message_driver_func_table(void)
@@ -81,7 +82,7 @@ single_get_func_table(void)
 VCHI_CONNECTION_T *vchi_create_connection(
 	const VCHI_CONNECTION_API_T *function_table,
 	const VCHI_MESSAGE_DRIVER_T *low_level)
-{
+{ // xzl: seems just placeholder
 	(void)function_table;
 	(void)low_level;
 	return NULL;

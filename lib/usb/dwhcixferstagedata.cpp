@@ -27,6 +27,8 @@
 #include <circle/timer.h>
 #include <assert.h>
 
+// xzl: the context of a stage (can be a stage of setup/data/status)
+// a xfer can have multiple stages
 CDWHCITransferStageData::CDWHCITransferStageData (unsigned	 nChannel,
 						  CUSBRequest	*pURB,
 						  boolean	 bIn,
@@ -61,7 +63,7 @@ CDWHCITransferStageData::CDWHCITransferStageData (unsigned	 nChannel,
 	if (!bStatusStage)
 	{
 		if (m_pEndpoint->GetNextPID (bStatusStage) == USBPIDSetup)
-		{
+		{ // xzl: setup stage. fixed data size
 			m_pBufferPointer = pURB->GetSetupData ();
 			m_nTransferSize = sizeof (TSetupData);
 		}
@@ -92,7 +94,7 @@ CDWHCITransferStageData::CDWHCITransferStageData (unsigned	 nChannel,
 			m_nPacketsPerTransaction = m_nPackets;
 		}
 	}
-	else
+	else // xzl: status stage. xfer bytes=0 packets=1 ...
 	{
 		assert (m_pTempBuffer == 0);
 		m_pTempBuffer = new u32[1];
@@ -160,7 +162,7 @@ void CDWHCITransferStageData::SetChannelNumber (unsigned nChannel)
 {
 	m_nChannel = nChannel;
 }
-
+// xzl: update stage state
 void CDWHCITransferStageData::TransactionComplete (u32 nStatus, u32 nPacketsLeft, u32 nBytesLeft)
 {
 #if 0
@@ -190,7 +192,7 @@ void CDWHCITransferStageData::TransactionComplete (u32 nStatus, u32 nPacketsLeft
 
 		return;
 	}
-
+	// xzl: for handling multiple data packets per tx?
 	u32 nPacketsTransfered = m_nPacketsPerTransaction - nPacketsLeft;
 	u32 nBytesTransfered = m_nBytesPerTransaction - nBytesLeft;
 

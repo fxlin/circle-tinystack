@@ -1053,7 +1053,7 @@ static bool get_parameter_iv_server(
                                                  RPC_INT(count),
                                                  values));
 }
-
+// xzl: core func to set contextual parameters
 static void set_ifv(
    CLIENT_THREAD_STATE_T *thread,
    VG_CLIENT_STATE_T *state,
@@ -4288,7 +4288,7 @@ VG_API_CALL void VG_API_ENTRY vgGetPixels(
              RPC_INT(src_x), RPC_INT(src_y),
              RPC_INT(width), RPC_INT(height));
 }
-
+// xzl: copy pixels from a drawing surface
 VG_API_CALL void VG_API_ENTRY vgReadPixels(
    void *data, VGint data_stride,
    VGImageFormat data_format,

@@ -40,7 +40,7 @@ public:
 
 	boolean Configure (void);
 
-	// cooked mode
+	// cooked mode (xzl: meaning not raw)
 	void RegisterKeyPressedHandler (TKeyPressedHandler *pKeyPressedHandler);
 	void RegisterSelectConsoleHandler (TSelectConsoleHandler *pSelectConsoleHandler);
 	void RegisterShutdownHandler (TShutdownHandler *pShutdownHandler);

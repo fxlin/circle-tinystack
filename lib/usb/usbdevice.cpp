@@ -165,6 +165,8 @@ CUSBDevice::~CUSBDevice (void)
 	m_pHost = 0;
 }
 
+// xzl: parse device descriptor, recognize interfaces
+// instiante recognized interfaces as  "funcs"
 boolean CUSBDevice::Initialize (void)
 {
 #if RASPPI <= 3 && defined (REALTIME) && !defined (USE_USB_SOF_INTR)
@@ -176,6 +178,8 @@ boolean CUSBDevice::Initialize (void)
 		return FALSE;
 	}
 #endif
+
+	LogWrite (LogDebug, "xzl: to init a usb device...");
 
 	assert (m_pDeviceDesc == 0);
 	m_pDeviceDesc = new TUSBDeviceDescriptor;
@@ -347,7 +351,7 @@ boolean CUSBDevice::Initialize (void)
 	}
 #endif
 
-	unsigned nFunction = 0;
+	unsigned nFunction = 0; // xzl: "function" is not a USB term.
 	u8 ucInterfaceNumber = 0;
 
 	TUSBInterfaceDescriptor *pInterfaceDesc;
@@ -368,11 +372,14 @@ boolean CUSBDevice::Initialize (void)
 
 		assert (m_pConfigParser != 0);
 		assert (m_pFunction[nFunction] == 0);
+		// xzl: add a new function to this device (just for probing?)
 		m_pFunction[nFunction] = new CUSBFunction (this, m_pConfigParser);
 		assert (m_pFunction[nFunction] != 0);
 
 		CUSBFunction *pChild = 0;
 
+		// xzl: no function for this device so far.
+		// try to discover a "child" device based on vendor (ven.., device class (dev..,
 		if (nFunction == 0)
 		{
 			pChild = CUSBDeviceFactory::GetDevice (m_pFunction[nFunction], GetName (DeviceNameVendor));
@@ -382,7 +389,7 @@ boolean CUSBDevice::Initialize (void)
 			}
 		}
 
-		if (pChild == 0)
+		if (pChild == 0) // not found. try to discover (USB func) based on interface info
 		{
 			CString *pName = m_pFunction[nFunction]->GetInterfaceName ();
 			assert (pName != 0);
@@ -397,7 +404,7 @@ boolean CUSBDevice::Initialize (void)
 				delete pName;
 			}
 		}
-
+		// xzl: delete the generic "func". to replace with a concrete one, if any
 		delete m_pFunction[nFunction];
 		m_pFunction[nFunction] = 0;
 
@@ -407,7 +414,8 @@ boolean CUSBDevice::Initialize (void)
 
 			continue;
 		}
-
+		// xzl: there's a device (recognized, e.g. mass storage) for the func. replace the generic "func"
+		// 	with the concrete one
 		m_pFunction[nFunction] = pChild;
 
 		if (!m_pFunction[nFunction]->Initialize ())
@@ -508,7 +516,7 @@ boolean CUSBDevice::RemoveDevice (void)
 	assert (m_pHub != 0);
 	return m_pHub->RemoveDevice (m_nHubPortIndex);
 }
-
+// xzl: assemble a usb device name... out of vendor ID, product ID, etc.
 CString *CUSBDevice::GetName (TDeviceNameSelector Selector) const
 {
 	CString *pString = new CString;
@@ -545,7 +553,7 @@ CString *CUSBDevice::GetName (TDeviceNameSelector Selector) const
 	
 	return pString;
 }
-
+// xzl: assemble a string of multi names (vendor, device, ...)
 CString *CUSBDevice::GetNames (void) const
 {
 	CString *pResult = new CString;

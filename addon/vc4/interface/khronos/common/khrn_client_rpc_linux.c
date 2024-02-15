@@ -24,6 +24,9 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// xzl: send/recv vchiq msgs?? why "rpc"?
+
 #define VCOS_LOG_CATEGORY (&khrn_client_log)
 
 #ifdef __circle__
@@ -51,6 +54,7 @@ extern VCOS_LOG_CAT_T khrn_client_log;
 static void *workspace; /* for scatter/gather bulks */
 static PLATFORM_MUTEX_T mutex;
 
+// xzl: what are these sevices?
 #define FOURCC_KHAN VCHIQ_MAKE_FOURCC('K', 'H', 'A', 'N')
 #define FOURCC_KHRN VCHIQ_MAKE_FOURCC('K', 'H', 'R', 'N')
 #define FOURCC_KHHN VCHIQ_MAKE_FOURCC('K', 'H', 'H', 'N')
@@ -269,7 +273,7 @@ static void check_workspace(uint32_t size)
       vcos_assert(workspace);
    }
 }
-
+// xzl: may flush to vchiq
 static void merge_flush(CLIENT_THREAD_STATE_T *thread)
 {
    vcos_log_trace("merge_flush start");
@@ -334,6 +338,7 @@ uint32_t rpc_send_ctrl_longest(CLIENT_THREAD_STATE_T *thread, uint32_t len_min)
    return len;
 }
 
+// xzl: reserve size for the msg?
 void rpc_send_ctrl_begin(CLIENT_THREAD_STATE_T *thread, uint32_t len)
 {
    //CLIENT_THREAD_STATE_T *thread = CLIENT_GET_THREAD_STATE();
@@ -346,6 +351,7 @@ void rpc_send_ctrl_begin(CLIENT_THREAD_STATE_T *thread, uint32_t len)
    thread->merge_end = thread->merge_pos + len;
 }
 
+// xzl: append msg to local buf??
 void rpc_send_ctrl_write(CLIENT_THREAD_STATE_T *thread, const uint32_t in[], uint32_t len) /* len bytes read, rpc_pad_ctrl(len) bytes written */
 {
    //CLIENT_THREAD_STATE_T *thread = CLIENT_GET_THREAD_STATE();
@@ -355,13 +361,14 @@ void rpc_send_ctrl_write(CLIENT_THREAD_STATE_T *thread, const uint32_t in[], uin
    vcos_assert(thread->merge_pos <= MERGE_BUFFER_SIZE);
 }
 
+// xzl: not flushing...
 void rpc_send_ctrl_end(CLIENT_THREAD_STATE_T *thread)
 {
    //CLIENT_THREAD_STATE_T *thread = CLIENT_GET_THREAD_STATE();
 
    vcos_assert(thread->merge_pos == thread->merge_end);
 }
-
+// xzl: rpc directly maps to vchiq
 static void send_bulk(CLIENT_THREAD_STATE_T *thread, const void *in, uint32_t len)
 {
    if (len <= KHDISPATCH_CTRL_THRESHOLD) {

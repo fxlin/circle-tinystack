@@ -90,6 +90,7 @@ typedef struct
 	int					m_numPaths;
 } PS;
 
+// xzl: construct paths for the tiger vector graphics?? one-time efforts
 PS* PS_construct(const char* commands, int commandCount, const float* points, int pointCount)
 {
 	PS* ps = (PS*)malloc(sizeof(PS));
@@ -278,7 +279,7 @@ void PS_destruct(PS* ps)
 	free(ps->m_paths);
 	free(ps);
 }
-
+// xzl: draw (constructed) paths. iterate over all paths
 void PS_render(PS* ps)
 {
 	int i;
@@ -307,7 +308,7 @@ void PS_render(PS* ps)
 PS* tiger = NULL;
 
 /*--------------------------------------------------------------*/
-
+// xzl: to be called repeatedly
 void render(int w, int h)
 {
 #ifndef __RASPBERRYPI__
@@ -344,7 +345,7 @@ void render(int w, int h)
 }
 
 /*--------------------------------------------------------------*/
-
+// xzl: get EGL surface...
 void init(NativeWindowType window)
 {
 	static const EGLint s_configAttribs[] =
@@ -363,7 +364,7 @@ void init(NativeWindowType window)
 	egldisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 	eglInitialize(egldisplay, NULL, NULL);
 	assert(eglGetError() == EGL_SUCCESS);
-	eglBindAPI(EGL_OPENVG_API);
+	eglBindAPI(EGL_OPENVG_API); // xzl: "Set the current rendering API"
 
 	eglChooseConfig(egldisplay, s_configAttribs, &eglconfig, 1, &numconfigs);
 	assert(eglGetError() == EGL_SUCCESS);

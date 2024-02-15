@@ -151,7 +151,7 @@ boolean CUSBKeyboardDevice::SetLEDs (u8 ucStatus)
 
 	return TRUE;
 }
-
+// xzl: callback for the base class
 void CUSBKeyboardDevice::ReportHandler (const u8 *pReport, unsigned nReportSize)
 {
 	if (   pReport == 0

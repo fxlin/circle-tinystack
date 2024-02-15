@@ -64,7 +64,7 @@ u8 CKeyboardBehaviour::GetLEDStatus (void) const
 {
 	return m_KeyMap.GetLEDStatus ();
 }
-
+// xzl: convert keycode, via keymap, to the final keystring? (passed to callback)
 void CKeyboardBehaviour::GenerateKeyEvent (u8 ucKeyCode)
 {
 	const char *pKeyString;

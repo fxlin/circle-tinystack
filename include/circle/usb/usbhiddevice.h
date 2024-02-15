@@ -39,7 +39,7 @@ protected:
 	// has to be called from Configure() in derived class, when initialization is done
 	boolean StartRequest (void);
 
-	// is called, when report arrives
+	// is called, when report arrives (xzl: callback from concrete devices?
 	virtual void ReportHandler (const u8 *pReport,
 				    unsigned nReportSize) = 0;		// pReport is 0 on failure
 

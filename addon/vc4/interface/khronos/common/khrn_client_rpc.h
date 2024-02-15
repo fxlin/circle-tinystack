@@ -358,6 +358,7 @@ static INLINE uint32_t rpc_pad_bulk(uint32_t len) { return len; }
 /* returns the length of the remainder of the merge buffer (after a flush if this length would be < len_min) */
 extern uint32_t rpc_send_ctrl_longest(CLIENT_THREAD_STATE_T *thread, uint32_t len_min);
 
+// xzl: useful??
 extern void rpc_send_ctrl_begin(CLIENT_THREAD_STATE_T *thread, uint32_t len); /* sum of padded lengths -- use rpc_pad_ctrl */
 extern void rpc_send_ctrl_write(CLIENT_THREAD_STATE_T *thread, const uint32_t msg[], uint32_t msglen); /* len bytes read, rpc_pad_ctrl(len) bytes written */
 extern void rpc_send_ctrl_end(CLIENT_THREAD_STATE_T *thread);

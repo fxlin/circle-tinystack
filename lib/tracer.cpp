@@ -117,7 +117,28 @@ void CTracer::Dump (void)
 	}
 }
 
+CString CTracer::DumpString (unsigned nEvent)
+{
+	CString msg;
+
+	if (m_bActive)
+		Stop ();
+
+	TTraceEntry *pEntry = m_pEntry + nEvent;
+	msg.Format("num=%08u ts=%02u.%06u evid=%02u para0=%08X para1=%08X para2=%08X para3=%08X\r\n",
+			nEvent, pEntry->nClockTicks / CLOCKHZ, pEntry->nClockTicks % CLOCKHZ,
+			pEntry->nEventID, pEntry->nParam[0], pEntry->nParam[1], pEntry->nParam[2], pEntry->nParam[3]);
+
+	return msg;
+}
+
 CTracer *CTracer::Get (void)
 {
 	return s_pThis;
+}
+
+// xzl
+unsigned CTracer::Count(void)
+{
+	return m_nCurrent;
 }

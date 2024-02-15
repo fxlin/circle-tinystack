@@ -32,6 +32,7 @@
 #include <circle/logger.h>
 #include <circle/usb/usbhcidevice.h>
 #include <circle/types.h>
+#include <circle/tracer.h>	// xzl
 
 enum TShutdownMode
 {
@@ -63,6 +64,7 @@ private:
 	CTimer			m_Timer;
 	CLogger			m_Logger;
 	CUSBHCIDevice		m_USBHCI;
+	CTracer			m_Tracer; // xzl
 };
 
 #endif

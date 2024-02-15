@@ -33,6 +33,7 @@
 #include <circle/usb/usbhcidevice.h>
 #include <circle/fs/fat/fatfs.h>
 #include <circle/types.h>
+#include <circle/tracer.h>	// xzl
 
 enum TShutdownMode
 {
@@ -66,6 +67,8 @@ private:
 	CUSBHCIDevice		m_USBHCI;
 
 	CFATFileSystem		m_FileSystem;
+
+	CTracer			m_Tracer; // xzl
 };
 
 #endif

@@ -46,7 +46,7 @@ private:
 	CMemorySystem		m_Memory;
 	CActLED			m_ActLED;
 	CKernelOptions		m_Options;
-	CDeviceNameService	m_DeviceNameService;
+	CDeviceNameService	m_DeviceNameService; // needed by log device.
 	CScreenDevice		m_Screen;
 	CSerialDevice		m_Serial;
 	CExceptionHandler	m_ExceptionHandler;

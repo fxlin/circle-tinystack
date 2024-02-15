@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
+// xzl: tx for upcoming frames?
 #ifndef _circle_usb_dwhcixactqueue_h
 #define _circle_usb_dwhcixactqueue_h
 

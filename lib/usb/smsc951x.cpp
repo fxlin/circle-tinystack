@@ -24,6 +24,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
+// xzl: a LAN chip atop a USB host
 #include <circle/usb/smsc951x.h>
 #include <circle/usb/usbhostcontroller.h>
 #include <circle/bcmpropertytags.h>
@@ -270,7 +271,7 @@ boolean CSMSC951xDevice::SendFrame (const void *pBuffer, unsigned nLength)
 	assert (m_pEndpointBulkOut != 0);
 	return GetHost ()->Transfer (m_pEndpointBulkOut, TxBuffer, nLength+8) >= 0;
 }
-
+// xzl: like polling?
 boolean CSMSC951xDevice::ReceiveFrame (void *pBuffer, unsigned *pResultLength)
 {
 	assert (m_pEndpointBulkIn != 0);
@@ -349,7 +350,7 @@ TNetDeviceSpeed CSMSC951xDevice::GetLinkSpeed (void)
 	default:	return NetDeviceSpeedUnknown;
 	}
 }
-
+// xzl: useful??
 boolean CSMSC951xDevice::PHYWrite (u8 uchIndex, u16 usValue)
 {
 	assert (uchIndex <= 31);
@@ -368,7 +369,7 @@ boolean CSMSC951xDevice::PHYWrite (u8 uchIndex, u16 usValue)
 
 	return PHYWaitNotBusy ();
 }
-
+// xzl: check link status, etc.
 boolean CSMSC951xDevice::PHYRead (u8 uchIndex, u16 *pValue)
 {
 	assert (uchIndex <= 31);

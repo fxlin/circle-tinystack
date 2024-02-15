@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define FN(type, name, args) extern type name args;
 #endif
 
+// xzl: these XXXX_impl not in use? external?
 FN(void, vgClearError_impl, (void))
 FN(void, vgSetError_impl, (VGErrorCode error))
 FN(VGErrorCode, vgGetError_impl, (void))

@@ -23,14 +23,14 @@ CIRCLEHOME ?= ..
 -include $(CIRCLEHOME)/Config.mk
 -include $(CIRCLEHOME)/Config2.mk	# is not overwritten by "configure"
 
+# xzl: the default option. dont change it here. change in Config.mk
 AARCH	 ?= 64
 RASPPI	 ?= 4
 PREFIX	 ?= arm-none-eabi-
-#PREFIX64 ?= aarch64-none-elf-
-PREFIX64 ?= aarch64-linux-gnu-
+PREFIX64 ?= aarch64-none-elf-
 
 # see: doc/stdlib-support.txt
-STDLIB_SUPPORT ?= 1
+STDLIB_SUPPORT ?= 1  # xzl: the default option. dont change it here. change in Config.mk 
 
 # set this to 0 to globally disable dependency checking
 CHECK_DEPS ?= 1
