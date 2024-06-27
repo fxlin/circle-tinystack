@@ -481,6 +481,7 @@ unsigned CUSBBulkOnlyMassStorageDevice::GetCapacity (void) const
 	return m_nBlockCount;
 }
 
+// xzl: main func for rw, below
 int CUSBBulkOnlyMassStorageDevice::TryRead (void *pBuffer, size_t nCount)
 {
 	assert (pBuffer != 0);
@@ -555,6 +556,7 @@ int CUSBBulkOnlyMassStorageDevice::TryWrite (const void *pBuffer, size_t nCount)
 	return nCount;
 }
 
+// xzl: use blocking request...
 int CUSBBulkOnlyMassStorageDevice::Command (void *pCmdBlk, size_t nCmdBlkLen,
 					    void *pBuffer, size_t nBufLen, boolean bIn)
 {

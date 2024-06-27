@@ -188,7 +188,7 @@
 #endif
 
 //
-// Clock Manager
+// Clock Manager			
 //
 #define ARM_CM_BASE		(ARM_IO_BASE + 0x101000)
 

@@ -35,6 +35,8 @@
 #include <circle/tracer.h>	// xzl
 #include <assert.h>
 
+// xzl the low level code for usb host controller...
+
 //
 // Configuration
 //
@@ -109,6 +111,7 @@ CDWHCIDevice::~CDWHCIDevice (void)
 	m_pTimer = 0;
 }
 
+// xzl: the init entry...
 boolean CDWHCIDevice::Initialize (boolean bScanDevices)
 {
 #ifndef USE_USB_SOF_INTR

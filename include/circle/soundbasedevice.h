@@ -153,14 +153,14 @@ private:
 
 	int m_nRangeMin;
 	int m_nRangeMax;
-	u8 m_NullFrame[SOUND_MAX_FRAME_SIZE];
+	u8 m_NullFrame[SOUND_MAX_FRAME_SIZE];		// xzl?? a null frame?
 
 	TSoundFormat m_WriteFormat;
 	unsigned m_nWriteChannels;
 	unsigned m_nWriteSampleSize;
 	unsigned m_nWriteFrameSize;
 
-	u8 *m_pQueue;			// Ring buffer
+	u8 *m_pQueue;			// Ring buffer	xzl: to be alloc (by #frames or time
 	unsigned m_nInPtr;
 	unsigned m_nOutPtr;
 

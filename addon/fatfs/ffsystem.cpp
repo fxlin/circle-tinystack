@@ -4,6 +4,7 @@
 /* Implementation for Circle by R. Stange <rsta2@o2online.de>             */
 /*------------------------------------------------------------------------*/
 
+// xzl: already has circle glue...
 
 #include "ff.h"
 #include <circle/spinlock.h>

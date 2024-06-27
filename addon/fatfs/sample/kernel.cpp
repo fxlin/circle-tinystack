@@ -94,7 +94,7 @@ TShutdownMode CKernel::Run (void)
 	m_Logger.Write (FromKernel, LogNotice, "Compile time: " __DATE__ " " __TIME__);
 
 	// Mount file system
-	if (f_mount (&m_FileSystem, DRIVE, 1) != FR_OK)
+	if (f_mount (&m_FileSystem, DRIVE, 1) != FR_OK)		// xzl: vol needs a string name
 	{
 		m_Logger.Write (FromKernel, LogPanic, "Cannot mount drive: %s", DRIVE);
 	}

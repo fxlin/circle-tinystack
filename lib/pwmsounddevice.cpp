@@ -50,6 +50,7 @@ CPWMSoundDevice::~CPWMSoundDevice (void)
 {
 }
 
+// xzl: called by app. load samples, .. then start() DMAs...
 void CPWMSoundDevice::Playback (void *pSoundData, unsigned nSamples, unsigned nChannels, unsigned nBitsPerSample)
 {
 	assert (!IsActive ());

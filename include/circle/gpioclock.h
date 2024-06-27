@@ -6,7 +6,7 @@
 
 #include <circle/types.h>
 
-enum TGPIOClock
+enum TGPIOClock		// xzl: thse are just types?
 {
 	GPIOClock0   = 0,			// on GPIO4 Alt0 or GPIO20 Alt5
 	GPIOClock1   = 1,			// RPi 4: on GPIO5 Alt0 or GPIO21 Alt5
@@ -15,8 +15,8 @@ enum TGPIOClock
 	GPIOClockPWM = 6
 };
 
-enum TGPIOClockSource
-{						// RPi 1-3:		RPi 4:
+enum TGPIOClockSource			// xzl: actul sources. 
+{										// RPi 1-3:		RPi 4:
 	GPIOClockSourceOscillator = 1,		// 19.2 MHz		54 MHz
 	GPIOClockSourcePLLC       = 5,		// 1000 MHz (varies)	1000 MHz (may vary)
 	GPIOClockSourcePLLD       = 6,		// 500 MHz		750 MHz

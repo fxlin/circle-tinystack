@@ -21,6 +21,7 @@
 #include <circle/util.h>
 #include <assert.h>
 
+// xzl: sound data mgmt (ringbuf, etc...)   no hw mgmt (the role of its subclass)
 CSoundBaseDevice::CSoundBaseDevice (TSoundFormat HWFormat, u32 nRange32, unsigned nSampleRate,
 				    boolean bSwapChannels)
 :	m_HWFormat (HWFormat),
@@ -87,7 +88,7 @@ int CSoundBaseDevice::GetRangeMax (void) const
 	return m_nRangeMax;
 }
 
-boolean CSoundBaseDevice::AllocateQueue (unsigned nSizeMsecs)
+boolean CSoundBaseDevice::AllocateQueue (unsigned nSizeMsecs)	// xzl: by playback time
 {
 	assert (m_pQueue == 0);
 	assert (1 <= nSizeMsecs && nSizeMsecs <= 1000);
@@ -106,7 +107,7 @@ boolean CSoundBaseDevice::AllocateQueue (unsigned nSizeMsecs)
 	return TRUE;
 }
 
-boolean CSoundBaseDevice::AllocateQueueFrames (unsigned nSizeFrames)
+boolean CSoundBaseDevice::AllocateQueueFrames (unsigned nSizeFrames)	// xzl: by n of frames
 {
 	assert (m_pQueue == 0);
 	assert (1 <= nSizeFrames && nSizeFrames <= m_nSampleRate);
@@ -154,7 +155,7 @@ void CSoundBaseDevice::SetWriteFormat (TSoundFormat Format, unsigned nChannels)
 
 	m_nWriteFrameSize = m_nWriteChannels * m_nWriteSampleSize;
 }
-
+// xzl: copy to ringbuf (w format conversion, etc
 int CSoundBaseDevice::Write (const void *pBuffer, size_t nCount)
 {
 	assert (m_WriteFormat < SoundFormatUnknown);
@@ -269,6 +270,7 @@ boolean CSoundBaseDevice::AreChannelsSwapped (void) const
 	return m_bSwapChannels;
 }
 
+// xzl: called by device drivers to get data for playback...
 unsigned CSoundBaseDevice::GetChunk (s16 *pBuffer, unsigned nChunkSize)
 {
 	assert (m_HWFormat == SoundFormatSigned16);
@@ -346,6 +348,7 @@ void CSoundBaseDevice::ConvertSoundFormat (void *pTo, const void *pFrom)
 	}
 }
 
+// xzl: dequeue data for device drivers....
 unsigned CSoundBaseDevice::GetChunkInternal (void *pBuffer, unsigned nChunkSize)
 {
 	u8 *pBuffer8 = static_cast<u8 *> (pBuffer);

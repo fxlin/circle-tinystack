@@ -70,7 +70,8 @@ void CGPIOClock::Start (unsigned nDivI, unsigned nDivF, unsigned nMASH)
 boolean CGPIOClock::StartRate (unsigned nRateHZ)
 {
 	assert (nRateHZ > 0);
-
+	// xzl: iterate through all available clock sources, find one aivalable ....
+	//			will write the source id to reg in Start()
 	for (unsigned nSourceId = 0; nSourceId <= GPIO_CLOCK_SOURCE_ID_MAX; nSourceId++)
 	{
 		unsigned nSourceRate = CMachineInfo::Get ()->GetGPIOClockSourceRate (nSourceId);

@@ -156,9 +156,9 @@ CPWMSoundBaseDevice::CPWMSoundBaseDevice (CInterruptSystem *pInterrupt,
 	m_pInterruptSystem (pInterrupt),
 	m_nChunkSize (nChunkSize),
 	m_nRange ((CLOCK_RATE + nSampleRate/2) / nSampleRate),
-	m_Audio1 (GPIOPinAudioLeft, GPIOModeAlternateFunction0),
+	m_Audio1 (GPIOPinAudioLeft, GPIOModeAlternateFunction0), //xzl gpio...
 	m_Audio2 (GPIOPinAudioRight, GPIOModeAlternateFunction0),
-	m_Clock (GPIOClockPWM),
+	m_Clock (GPIOClockPWM),		// xzl: GPIOClockPWM is a type ...?
 	m_bIRQConnected (FALSE),
 	m_State (PWMSoundIdle),
 	m_nDMAChannel (CMachineInfo::Get ()->AllocateDMAChannel (DMA_CHANNEL_LITE))
@@ -345,6 +345,7 @@ boolean CPWMSoundBaseDevice::IsActive (void) const
 	return m_State != PWMSoundIdle ? TRUE : FALSE;
 }
 
+// xzl: just check sizes, and flush cache...
 boolean CPWMSoundBaseDevice::GetNextChunk (void)
 {
 	assert (m_pDMABuffer[m_nNextBuffer] != 0);
@@ -375,7 +376,7 @@ void CPWMSoundBaseDevice::RunPWM (void)
 #ifndef NDEBUG
 	boolean bOK =
 #endif
-		m_Clock.StartRate (CLOCK_RATE);
+		m_Clock.StartRate (CLOCK_RATE);		// xzl understadn btr
 	assert (bOK);
 	CTimer::SimpleusDelay (2000);
 

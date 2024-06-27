@@ -10,6 +10,8 @@
 // xzl: seems a dummy block layer
 #include "ff.h"			/* Obtains integer types */
 #include "diskio.h"		/* Declarations of disk functions */
+
+// xzl: alrady has circle header??
 #include <circle/device.h>
 #include <circle/devicenameservice.h>
 #include <circle/util.h>
@@ -25,6 +27,8 @@
 /* Static Data                                                           */
 /*-----------------------------------------------------------------------*/
 
+// xzl: each "volume" is a disk (or a partition)... rep by a  CDevice
+//	 		xzl fatfs vol needs a name
 static const char *s_pVolumeName[FF_VOLUMES] =
 {
 	"emmc1",

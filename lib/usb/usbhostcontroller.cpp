@@ -117,6 +117,7 @@ int CUSBHostController::ControlMessage (CUSBEndpoint *pEndpoint,
 	return nResult;
 }
 
+// xzl: blocking..
 int CUSBHostController::Transfer (CUSBEndpoint *pEndpoint, void *pBuffer, unsigned nBufSize,
 				  unsigned nTimeoutMs)
 {
